@@ -14,6 +14,7 @@ import {
   logout,
   saveAdminSettings,
   sendChatCompletion,
+  sendEmbeddingsCreate,
   sendResponseCreate,
   clearStoredAdminJwt,
   storeAdminJwt,
@@ -23,6 +24,7 @@ import {
   type ApiTokenCreateResult,
   type ApiTokenDescriptor,
   type ChatCompletionResponse,
+  type EmbeddingsCreateResult,
   type ModelListData,
   type ResponseCreateResult,
   type SessionData,
@@ -33,7 +35,7 @@ import {
 const capabilityCards = [
   {
     title: 'OpenAI-Compatible Relay',
-    body: '当前主链已经提供 /v1/models、/v1/chat/completions 与 /v1/responses，未配置上游时会显式失败。'
+    body: '当前主链已经提供 /v1/models、/v1/chat/completions、/v1/embeddings 与 /v1/responses，未配置上游时会显式失败。'
   },
   {
     title: 'Session Login',
@@ -179,11 +181,11 @@ function PlaygroundPanel(props: {
   models: ModelListData | null;
   modelsError: string | null;
   pending: boolean;
-  playgroundResult: ChatCompletionResponse | ResponseCreateResult | null;
+  playgroundResult: ChatCompletionResponse | ResponseCreateResult | EmbeddingsCreateResult | null;
   chatError: string | null;
   onReloadModels: () => Promise<void>;
   onSend: (input: {
-    mode: 'chat' | 'responses';
+    mode: 'chat' | 'responses' | 'embeddings';
     model: string;
     prompt: string;
     systemPrompt: string;
@@ -205,9 +207,12 @@ function PlaygroundPanel(props: {
   const [model, setModel] = useState('');
   const [prompt, setPrompt] = useState('用一句话说明你是一个 Cloudflare 上运行的最小 AI 网关。');
   const [systemPrompt, setSystemPrompt] = useState('你是一个简洁的系统说明助手。');
-  const [mode, setMode] = useState<'chat' | 'responses'>('responses');
+  const [mode, setMode] = useState<'chat' | 'responses' | 'embeddings'>('responses');
   const [useApiToken, setUseApiToken] = useState(false);
   const [relayToken, setRelayToken] = useState('');
+
+  const usesSystemPrompt = mode !== 'embeddings';
+  const endpointLabel = mode === 'responses' ? '/v1/responses' : mode === 'chat' ? '/v1/chat/completions' : '/v1/embeddings';
 
   useEffect(() => {
     if (!model && models && models.data.length > 0) {
@@ -264,6 +269,14 @@ function PlaygroundPanel(props: {
           >
             /v1/chat/completions
           </button>
+          <button
+            className={`chip ${mode === 'embeddings' ? 'chip-active' : ''}`}
+            disabled={pending}
+            onClick={() => setMode('embeddings')}
+            type="button"
+          >
+            /v1/embeddings
+          </button>
         </div>
         {modelsError ? <p className="error-text">{modelsError}</p> : null}
         {!playgroundEnabled ? <p className="error-text">当前 D1 设置已关闭 playground。</p> : null}
@@ -288,18 +301,22 @@ function PlaygroundPanel(props: {
               </option>
             ))}
           </select>
-          <label className="label" htmlFor="system-prompt">
-            System Prompt
-          </label>
-          <textarea
-            id="system-prompt"
-            className="input textarea"
-            disabled={pending}
-            onChange={(event) => setSystemPrompt(event.target.value)}
-            value={systemPrompt}
-          />
+          {usesSystemPrompt ? (
+            <>
+              <label className="label" htmlFor="system-prompt">
+                System Prompt
+              </label>
+              <textarea
+                id="system-prompt"
+                className="input textarea"
+                disabled={pending}
+                onChange={(event) => setSystemPrompt(event.target.value)}
+                value={systemPrompt}
+              />
+            </>
+          ) : null}
           <label className="label" htmlFor="user-prompt">
-            User Prompt
+            {mode === 'embeddings' ? 'Embedding Input' : 'User Prompt'}
           </label>
           <textarea
             id="user-prompt"
@@ -315,7 +332,7 @@ function PlaygroundPanel(props: {
               onChange={(event) => setUseApiToken(event.target.checked)}
               type="checkbox"
             />
-            <span>使用 API token 调用 `/v1/chat/completions`</span>
+            <span>使用 API token 调用 <code>{endpointLabel}</code></span>
           </label>
           {useApiToken ? (
             <>
@@ -333,7 +350,7 @@ function PlaygroundPanel(props: {
             </>
           ) : null}
           <button className="action" disabled={pending || !playgroundEnabled || !model || prompt.trim().length === 0} type="submit">
-            {pending ? '请求中...' : `发送到 ${mode === 'responses' ? '/v1/responses' : '/v1/chat/completions'}`}
+            {pending ? '请求中...' : `发送到 ${endpointLabel}`}
           </button>
         </form>
         {chatError ? <p className="error-text">{chatError}</p> : null}
@@ -795,7 +812,7 @@ export function App() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [chatResult, setChatResult] = useState<ChatCompletionResponse | ResponseCreateResult | null>(null);
+  const [chatResult, setChatResult] = useState<ChatCompletionResponse | ResponseCreateResult | EmbeddingsCreateResult | null>(null);
   const [pending, setPending] = useState(false);
   const [storedAdminJwt, setStoredAdminJwt] = useState('');
 
@@ -956,7 +973,7 @@ export function App() {
   }
 
   async function handleSend(input: {
-    mode: 'chat' | 'responses';
+    mode: 'chat' | 'responses' | 'embeddings';
     model: string;
     prompt: string;
     systemPrompt: string;
@@ -967,7 +984,9 @@ export function App() {
     try {
       const result = input.mode === 'responses'
         ? await sendResponseCreate(input)
-        : await sendChatCompletion(input);
+        : input.mode === 'embeddings'
+          ? await sendEmbeddingsCreate(input)
+          : await sendChatCompletion(input);
       setChatResult(result);
       await refreshAdminUsage();
     } catch (cause) {

@@ -144,6 +144,20 @@ export type ChatCompletionResponse = {
 
 export type ResponseCreateResult = Record<string, unknown>;
 
+export type EmbeddingsCreateResult = {
+  object: 'list';
+  data: Array<{
+    object: 'embedding';
+    index: number;
+    embedding: number[] | string;
+  }>;
+  model: string;
+  usage?: {
+    prompt_tokens?: number;
+    total_tokens?: number;
+  };
+};
+
 const EDGE_API_BASE_URL = import.meta.env.VITE_EDGE_API_BASE_URL ?? '';
 const ADMIN_JWT_STORAGE_KEY = 'new-api-cf.admin-jwt';
 
@@ -293,6 +307,26 @@ export function sendResponseCreate(input: {
     body: JSON.stringify({
       model: input.model,
       instructions: input.systemPrompt?.trim() || undefined,
+      input: input.prompt.trim()
+    })
+  });
+}
+
+export function sendEmbeddingsCreate(input: {
+  model: string;
+  prompt: string;
+  bearerToken?: string;
+}) {
+  const headers = new Headers();
+  if (input.bearerToken && input.bearerToken.trim().length > 0) {
+    headers.set('authorization', `Bearer ${input.bearerToken.trim()}`);
+  }
+
+  return request<EmbeddingsCreateResult>('/v1/embeddings', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: input.model,
       input: input.prompt.trim()
     })
   });
