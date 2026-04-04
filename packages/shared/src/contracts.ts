@@ -51,6 +51,9 @@ export interface ModelDescriptor {
   ownedBy: string;
   label?: string;
   enabled?: boolean;
+  upstreamProfileId?: string;
+  upstreamProfileExists?: boolean;
+  upstreamProfileSupportsModel?: boolean;
 }
 
 export type ChatMessageRole = 'system' | 'user' | 'assistant' | 'tool';
@@ -95,6 +98,7 @@ export interface AdminStateShape {
   stateStore: StateStoreKind;
   settings: ControlSettingValues;
   models: ModelDescriptor[];
+  profiles: UpstreamProfileDescriptor[];
 }
 
 export interface ApiTokenDescriptor {
@@ -109,4 +113,45 @@ export interface ApiTokenDescriptor {
 export interface ApiTokenCreateResult {
   token: string;
   descriptor: ApiTokenDescriptor;
+}
+
+export interface UpstreamProfileDescriptor {
+  id: string;
+  label: string;
+  providerName: string;
+  modelCount: number;
+  supportedModelIds: string[];
+  assignedModelIds: string[];
+  enabledAssignedModelIds: string[];
+  isDefault: boolean;
+}
+
+export type UsageActorKind = 'admin-session' | 'api-token';
+
+export interface UsageAggregateRow {
+  usageDate: string;
+  actorKind: UsageActorKind;
+  actorId: string;
+  actorLabel: string;
+  actorLast4?: string;
+  upstreamProfileId: string;
+  upstreamProfileLabel: string;
+  model: string;
+  requestCount: number;
+  successCount: number;
+  errorCount: number;
+  lastStatus: number;
+  updatedAt: string;
+}
+
+export interface UsageOverviewShape {
+  windowDays: number;
+  totals: {
+    requestCount: number;
+    successCount: number;
+    errorCount: number;
+    activeActorCount: number;
+    activeModelCount: number;
+  };
+  rows: UsageAggregateRow[];
 }

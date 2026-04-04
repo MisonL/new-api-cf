@@ -14,8 +14,8 @@ export function createChatRouter() {
     });
     const request = chatCompletionRequestSchema.parse(payload);
     const config = getRuntimeConfig(c.env);
-    await requireRelayAccess(c, config);
-    return forwardChatCompletion(c.env, request, config);
+    const access = await requireRelayAccess(c, config);
+    return forwardChatCompletion(c.env, request, config, access);
   });
 
   return router;

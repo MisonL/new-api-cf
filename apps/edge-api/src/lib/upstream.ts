@@ -3,9 +3,11 @@ import type {
   ModelDescriptor,
   StateStoreKind
 } from '../../../../packages/shared/src/contracts';
-import type { RuntimeConfig } from './config';
+import { getUpstreamProfileById, profileSupportsModel, type RuntimeConfig } from './config';
 import { ApiError } from './errors';
 import { getEnabledModels } from './control-plane';
+import type { RelayAccessContext } from './relay-auth';
+import { recordUsage } from './usage';
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
@@ -19,22 +21,25 @@ function getUpstreamHeaders(apiKey: string) {
 }
 
 export function buildModelList(config: RuntimeConfig): ModelDescriptor[] {
-  return config.modelAllowlist.map((modelId) => ({
-    id: modelId,
-    provider: 'openai-compatible',
-    object: 'model',
-    ownedBy: config.upstreamProviderName,
-    label: modelId
-  }));
+  return config.upstreamProfiles.flatMap((profile) =>
+    profile.modelAllowlist.map((modelId) => ({
+      id: modelId,
+      provider: 'openai-compatible' as const,
+      object: 'model' as const,
+      ownedBy: profile.providerName,
+      label: modelId,
+      upstreamProfileId: profile.id
+    }))
+  );
 }
 
 export function ensureUpstreamReady(config: RuntimeConfig) {
-  if (!config.upstreamBaseUrl || !config.upstreamApiKey) {
-    throw new ApiError(503, 'UPSTREAM_NOT_CONFIGURED', 'upstream base url or api key is missing');
+  if (config.upstreamProfiles.length === 0) {
+    throw new ApiError(503, 'UPSTREAM_NOT_CONFIGURED', 'upstream profile is missing');
   }
 
   if (config.modelAllowlist.length === 0) {
-    throw new ApiError(503, 'MODEL_ALLOWLIST_EMPTY', 'OPENAI_MODEL_ALLOWLIST is empty');
+    throw new ApiError(503, 'MODEL_ALLOWLIST_EMPTY', 'upstream profile model allowlists are empty');
   }
 }
 
@@ -54,16 +59,39 @@ export async function resolveModelCatalog(env: Env, config: RuntimeConfig): Prom
   return getEnabledModels(env, config);
 }
 
+function resolveUpstreamProfile(config: RuntimeConfig, modelCatalog: ModelDescriptor[], model: string) {
+  const descriptor = modelCatalog.find((item) => item.id === model);
+  const profile = getUpstreamProfileById(config, descriptor?.upstreamProfileId);
+
+  if (!profile) {
+    throw new ApiError(503, 'UPSTREAM_PROFILE_NOT_FOUND', 'model does not have a usable upstream profile', {
+      model,
+      upstreamProfileId: descriptor?.upstreamProfileId
+    });
+  }
+
+  if (!profileSupportsModel(config, profile.id, model)) {
+    throw new ApiError(400, 'UPSTREAM_PROFILE_MODEL_MISMATCH', 'model is not declared by the selected upstream profile', {
+      model,
+      upstreamProfileId: profile.id
+    });
+  }
+
+  return profile;
+}
+
 export async function forwardChatCompletion(
   env: Env,
   request: ChatCompletionRequestShape,
-  config: RuntimeConfig
+  config: RuntimeConfig,
+  access: RelayAccessContext
 ): Promise<Response> {
   ensureUpstreamReady(config);
   const catalog = await resolveModelCatalog(env, config);
   assertModelAllowed(request.model, catalog.models, catalog.stateStore);
+  const profile = resolveUpstreamProfile(config, catalog.models, request.model);
 
-  const baseUrl = normalizeBaseUrl(config.upstreamBaseUrl!);
+  const baseUrl = normalizeBaseUrl(profile.baseUrl);
   const abortController = new AbortController();
   const timeoutHandle = setTimeout(() => abortController.abort(), config.upstreamTimeoutMs);
   let upstreamResponse: Response;
@@ -71,23 +99,45 @@ export async function forwardChatCompletion(
   try {
     upstreamResponse = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: getUpstreamHeaders(config.upstreamApiKey!),
+      headers: getUpstreamHeaders(profile.apiKey),
       body: JSON.stringify(request),
       signal: abortController.signal
     });
   } catch (cause) {
     if (abortController.signal.aborted) {
+      await recordUsage(env, {
+        actor: access.usageActor,
+        upstreamProfileId: profile.id,
+        model: request.model,
+        outcome: 'error',
+        statusCode: 504
+      });
       throw new ApiError(504, 'UPSTREAM_TIMEOUT', 'upstream request timed out', {
         timeoutMs: config.upstreamTimeoutMs
       });
     }
 
+    await recordUsage(env, {
+      actor: access.usageActor,
+      upstreamProfileId: profile.id,
+      model: request.model,
+      outcome: 'error',
+      statusCode: 502
+    });
     throw new ApiError(502, 'UPSTREAM_FETCH_FAILED', 'failed to reach upstream provider', {
       message: cause instanceof Error ? cause.message : String(cause)
     });
   } finally {
     clearTimeout(timeoutHandle);
   }
+
+  await recordUsage(env, {
+    actor: access.usageActor,
+    upstreamProfileId: profile.id,
+    model: request.model,
+    outcome: upstreamResponse.ok ? 'success' : 'error',
+    statusCode: upstreamResponse.status
+  });
 
   const responseHeaders = new Headers();
   const contentType = upstreamResponse.headers.get('content-type');

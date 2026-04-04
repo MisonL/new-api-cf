@@ -17,6 +17,7 @@ export function createRootRouter() {
         '/api/admin/bootstrap',
         '/api/admin/settings',
         '/api/admin/tokens',
+        '/api/admin/usage',
         '/api/me',
         '/api/models',
         '/v1/models',

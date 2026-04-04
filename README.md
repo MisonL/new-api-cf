@@ -28,6 +28,7 @@
   - `PUT /api/admin/settings`
   - `PATCH /api/admin/models/:id`
   - `GET /api/admin/tokens`
+  - `GET /api/admin/usage`
   - `POST /api/admin/tokens`
   - `PATCH /api/admin/tokens/:id`
   - `DELETE /api/admin/tokens/:id`
@@ -41,6 +42,7 @@
   - D1 控制面设置
   - 模型目录编辑
   - API token 管理
+  - usage 聚合概览
   - 最小 chat playground
 - `packages/shared`
   - 共享 DTO、错误模型和最小 relay 契约
@@ -48,6 +50,7 @@
 说明：
 
 - 当前 relay 只支持 OpenAI-compatible 上游
+- 当前已支持“多 upstream profile 定义在 Worker env，模型到 profile 映射落在 D1”
 - 若未配置上游环境变量，`/api/models` 和 `/v1/chat/completions` 会显式失败
 - 若使用 `AUTH_MODE=session`，可通过 admin token 登录换取 HMAC 签名 cookie
 - 若前端与 Worker 分域部署，需显式配置 `CORS_ORIGIN`
@@ -58,6 +61,15 @@
   - `control_settings`
   - `relay_models`
   - `api_tokens`
+  - `usage_daily`
+- 若绑定 `MODEL_CATALOG_CACHE`，Worker 会把“启用中的模型目录快照”写入 KV：
+  - 只在 bootstrap / 模型更新时刷新
+  - 读取命中时优先走 KV，降低 `/api/models` 和 relay 前置校验的 D1 读取
+  - 不承载配额、计数器或其他强一致状态
+- `/api/admin/usage` 提供近 1 到 30 天的 D1 usage 日聚合视图：
+  - 按 `usage_date + actor + upstream profile + model` 聚合
+  - 当前只记录请求数、成功数、失败数和最近状态码
+  - 不写逐请求明细，优先控制 Free 额度写放大
 - 当 Worker 已绑定 D1 且目录为空时，`/api/models` 会显式返回 `MODEL_CATALOG_EMPTY`
 - `/v1/models` 与 `/v1/chat/completions` 当前要求：
   - admin session
@@ -84,7 +96,16 @@ bun run --cwd apps/edge-api d1:migrate:local
 - `OPENAI_API_KEY=<key>`
 - `OPENAI_MODEL_ALLOWLIST=gpt-4o-mini,gpt-4.1-mini`
 - `OPENAI_PROVIDER_NAME=<provider-name>`
+- `UPSTREAM_PROFILES_JSON=[{"id":"primary","label":"Primary","baseUrl":"https://.../v1","apiKey":"...","providerName":"provider-a","modelAllowlist":["gpt-4o-mini"]}]`
+- `UPSTREAM_DEFAULT_PROFILE_ID=primary`
+- `MODEL_CATALOG_CACHE=<optional KV binding>`
 - `VITE_EDGE_API_BASE_URL=https://edge.example.com`
+
+说明：
+
+- 推荐使用 `UPSTREAM_PROFILES_JSON` + `UPSTREAM_DEFAULT_PROFILE_ID` 定义多个 upstream profile
+- `relay_models.upstream_profile_id` 负责把模型绑定到某个 profile
+- 旧的 `OPENAI_*` 单 profile 环境变量仍可继续作为兼容入口
 
 本地 D1 初始化流程：
 

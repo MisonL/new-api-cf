@@ -24,6 +24,7 @@ export type StatusData = {
   stateStore: 'env' | 'd1';
   modelCount: number;
   d1Configured: boolean;
+  kvConfigured?: boolean;
   endpoints: {
     admin: string[];
     openaiCompatible: string[];
@@ -47,6 +48,9 @@ export type ModelListData = {
     ownedBy: string;
     label?: string;
     enabled?: boolean;
+    upstreamProfileId?: string;
+    upstreamProfileExists?: boolean;
+    upstreamProfileSupportsModel?: boolean;
   }>;
 };
 
@@ -64,6 +68,19 @@ export type AdminState = {
     ownedBy: string;
     label?: string;
     enabled?: boolean;
+    upstreamProfileId?: string;
+    upstreamProfileExists?: boolean;
+    upstreamProfileSupportsModel?: boolean;
+  }>;
+  profiles: Array<{
+    id: string;
+    label: string;
+    providerName: string;
+    modelCount: number;
+    supportedModelIds: string[];
+    assignedModelIds: string[];
+    enabledAssignedModelIds: string[];
+    isDefault: boolean;
   }>;
 };
 
@@ -79,6 +96,32 @@ export type ApiTokenDescriptor = {
 export type ApiTokenCreateResult = {
   token: string;
   descriptor: ApiTokenDescriptor;
+};
+
+export type UsageOverview = {
+  windowDays: number;
+  totals: {
+    requestCount: number;
+    successCount: number;
+    errorCount: number;
+    activeActorCount: number;
+    activeModelCount: number;
+  };
+  rows: Array<{
+    usageDate: string;
+    actorKind: 'admin-session' | 'api-token';
+    actorId: string;
+    actorLabel: string;
+    actorLast4?: string;
+    upstreamProfileId: string;
+    upstreamProfileLabel: string;
+    model: string;
+    requestCount: number;
+    successCount: number;
+    errorCount: number;
+    lastStatus: number;
+    updatedAt: string;
+  }>;
 };
 
 export type ChatCompletionResponse = {
@@ -206,7 +249,7 @@ export function saveAdminSettings(settings: AdminState['settings']) {
   });
 }
 
-export function updateAdminModel(modelId: string, input: { label: string; enabled: boolean }) {
+export function updateAdminModel(modelId: string, input: { label: string; enabled: boolean; upstreamProfileId: string }) {
   return request<{ saved: boolean }>(`/api/admin/models/${encodeURIComponent(modelId)}`, {
     method: 'PATCH',
     body: JSON.stringify(input)
@@ -215,6 +258,12 @@ export function updateAdminModel(modelId: string, input: { label: string; enable
 
 export function fetchAdminTokens() {
   return request<{ data: ApiTokenDescriptor[] }>('/api/admin/tokens', {
+    method: 'GET'
+  });
+}
+
+export function fetchAdminUsage(days = 7) {
+  return request<UsageOverview>(`/api/admin/usage?days=${encodeURIComponent(String(days))}`, {
     method: 'GET'
   });
 }

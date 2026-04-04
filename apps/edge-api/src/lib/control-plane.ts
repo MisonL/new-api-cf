@@ -4,11 +4,13 @@ import type {
   ApiTokenDescriptor,
   ControlSettingValues,
   ModelDescriptor,
-  StateStoreKind
+  StateStoreKind,
+  UpstreamProfileDescriptor
 } from '../../../../packages/shared/src/contracts';
 import { execute, queryAll, queryFirst } from './d1';
 import { ApiError } from './errors';
-import type { RuntimeConfig } from './config';
+import { getUpstreamProfileById, getUpstreamProfiles, profileSupportsModel, type RuntimeConfig } from './config';
+import { purgeModelCatalogCache, readModelCatalogCache, writeModelCatalogCache } from './model-catalog-cache';
 import { generateApiToken, hashApiToken, last4OfToken } from './token-auth';
 
 const DEFAULT_SETTINGS: ControlSettingValues = {
@@ -22,6 +24,7 @@ type ModelRow = {
   provider: string;
   label: string;
   enabled: number;
+  upstream_profile_id: string;
 };
 
 type SettingRow = {
@@ -42,24 +45,53 @@ function now(): string {
 }
 
 function fromEnvModels(config: RuntimeConfig): ModelDescriptor[] {
-  return config.modelAllowlist.map((id) => ({
-    id,
-    provider: 'openai-compatible',
-    object: 'model',
-    ownedBy: config.upstreamProviderName,
-    label: id,
-    enabled: true
-  }));
+  const seen = new Set<string>();
+  const models: ModelDescriptor[] = [];
+
+  for (const profile of config.upstreamProfiles) {
+    for (const id of profile.modelAllowlist) {
+      if (seen.has(id)) {
+        continue;
+      }
+
+      seen.add(id);
+      models.push({
+        id,
+        provider: 'openai-compatible',
+        object: 'model',
+        ownedBy: profile.providerName,
+        label: id,
+        enabled: true,
+        upstreamProfileId: profile.id,
+        upstreamProfileExists: true,
+        upstreamProfileSupportsModel: true
+      });
+    }
+  }
+
+  return models;
 }
 
-function toModelDescriptor(row: ModelRow): ModelDescriptor {
+function resolveModelProfileId(row: ModelRow, config: RuntimeConfig): string | undefined {
+  return row.upstream_profile_id || config.defaultUpstreamProfileId;
+}
+
+function toModelDescriptor(row: ModelRow, config: RuntimeConfig): ModelDescriptor {
+  const upstreamProfileId = resolveModelProfileId(row, config);
+  const upstreamProfileExists = Boolean(getUpstreamProfileById(config, upstreamProfileId));
+  const upstreamProfileSupportsModel = upstreamProfileExists
+    ? profileSupportsModel(config, upstreamProfileId, row.id)
+    : false;
   return {
     id: row.id,
     provider: 'openai-compatible',
     object: 'model',
     ownedBy: row.provider,
     label: row.label,
-    enabled: row.enabled === 1
+    enabled: row.enabled === 1,
+    upstreamProfileId,
+    upstreamProfileExists,
+    upstreamProfileSupportsModel
   };
 }
 
@@ -74,13 +106,48 @@ function toApiTokenDescriptor(row: ApiTokenRow): ApiTokenDescriptor {
   };
 }
 
-async function getAllModelsFromD1(env: Env): Promise<ModelDescriptor[]> {
+function attachAssignedModels(
+  profiles: UpstreamProfileDescriptor[],
+  models: ModelDescriptor[]
+): UpstreamProfileDescriptor[] {
+  return profiles.map((profile) => {
+    const assignedModels = models.filter((model) => model.upstreamProfileId === profile.id);
+    return {
+      ...profile,
+      assignedModelIds: assignedModels.map((model) => model.id),
+      enabledAssignedModelIds: assignedModels.filter((model) => model.enabled !== false).map((model) => model.id)
+    };
+  });
+}
+
+async function getAllModelsFromD1(env: Env, config: RuntimeConfig): Promise<ModelDescriptor[]> {
   const rows = await queryAll<ModelRow>(
     env,
-    'SELECT id, provider, label, enabled FROM relay_models ORDER BY id ASC'
+    'SELECT id, provider, label, enabled, upstream_profile_id FROM relay_models ORDER BY id ASC'
   );
 
-  return rows.map(toModelDescriptor);
+  return rows.map((row) => toModelDescriptor(row, config));
+}
+
+async function refreshEnabledModelCatalogCache(env: Env, config: RuntimeConfig) {
+  if (!env.DB) {
+    return;
+  }
+
+  const rows = await queryAll<ModelRow>(
+    env,
+    'SELECT id, provider, label, enabled, upstream_profile_id FROM relay_models WHERE enabled = 1 ORDER BY id ASC'
+  );
+
+  if (rows.length === 0) {
+    await purgeModelCatalogCache(env);
+    return;
+  }
+
+  await writeModelCatalogCache(
+    env,
+    rows.map((row) => toModelDescriptor(row, config))
+  );
 }
 
 export async function getEnabledModels(env: Env, config: RuntimeConfig): Promise<{
@@ -94,18 +161,29 @@ export async function getEnabledModels(env: Env, config: RuntimeConfig): Promise
     };
   }
 
+  const cachedModels = await readModelCatalogCache(env);
+  if (cachedModels && cachedModels.length > 0) {
+    return {
+      stateStore: 'd1',
+      models: cachedModels
+    };
+  }
+
   const rows = await queryAll<ModelRow>(
     env,
-    'SELECT id, provider, label, enabled FROM relay_models WHERE enabled = 1 ORDER BY id ASC'
+    'SELECT id, provider, label, enabled, upstream_profile_id FROM relay_models WHERE enabled = 1 ORDER BY id ASC'
   );
 
   if (rows.length === 0) {
     throw new ApiError(503, 'MODEL_CATALOG_EMPTY', 'D1 model catalog is empty');
   }
 
+  const models = rows.map((row) => toModelDescriptor(row, config));
+  await writeModelCatalogCache(env, models);
+
   return {
     stateStore: 'd1',
-    models: rows.map(toModelDescriptor)
+    models
   };
 }
 
@@ -142,26 +220,34 @@ export async function saveControlSettings(env: Env, settings: ControlSettingValu
 
 export async function getAdminState(env: Env, config: RuntimeConfig): Promise<AdminStateShape> {
   if (!env.DB) {
+    const envModels = fromEnvModels(config);
     return {
       stateStore: 'env',
       settings: DEFAULT_SETTINGS,
-      models: fromEnvModels(config)
+      models: envModels,
+      profiles: attachAssignedModels(getUpstreamProfiles(config), envModels)
     };
   }
 
   const settings = await getControlSettings(env);
-  const models = await getAllModelsFromD1(env);
+  const models = await getAllModelsFromD1(env, config);
 
   return {
     stateStore: 'd1',
     settings,
-    models
+    models,
+    profiles: attachAssignedModels(getUpstreamProfiles(config), models)
   };
 }
 
 export async function bootstrapControlPlane(env: Env, config: RuntimeConfig) {
   if (!env.DB) {
     throw new ApiError(503, 'D1_NOT_CONFIGURED', 'D1 binding is not configured');
+  }
+
+  const bootstrapModels = fromEnvModels(config);
+  if (bootstrapModels.length === 0) {
+    throw new ApiError(503, 'UPSTREAM_BOOTSTRAP_EMPTY', 'no upstream profile models are available for bootstrap');
   }
 
   const countRow = await queryFirst<{ count: number }>(
@@ -174,40 +260,47 @@ export async function bootstrapControlPlane(env: Env, config: RuntimeConfig) {
   }
 
   const timestamp = now();
-  for (const modelId of config.modelAllowlist) {
+  for (const model of bootstrapModels) {
     await execute(
       env,
-      `INSERT INTO relay_models (id, provider, label, enabled, created_at, updated_at)
-       VALUES (?, ?, ?, 1, ?, ?)`,
-      modelId,
-      config.upstreamProviderName,
-      modelId,
+      `INSERT INTO relay_models (id, provider, label, enabled, upstream_profile_id, created_at, updated_at)
+       VALUES (?, ?, ?, 1, ?, ?, ?)`,
+      model.id,
+      model.ownedBy,
+      model.label || model.id,
+      model.upstreamProfileId || '',
       timestamp,
       timestamp
     );
   }
 
   await saveControlSettings(env, DEFAULT_SETTINGS);
+  await writeModelCatalogCache(env, bootstrapModels);
 
   return getAdminState(env, config);
 }
 
 export async function updateModel(
   env: Env,
+  config: RuntimeConfig,
   input: {
     id: string;
     label: string;
     enabled: boolean;
+    provider: string;
+    upstreamProfileId: string;
   }
 ) {
   const timestamp = now();
   const result = await execute(
     env,
     `UPDATE relay_models
-     SET label = ?, enabled = ?, updated_at = ?
+     SET provider = ?, label = ?, enabled = ?, upstream_profile_id = ?, updated_at = ?
      WHERE id = ?`,
+    input.provider,
     input.label,
     input.enabled ? 1 : 0,
+    input.upstreamProfileId,
     timestamp,
     input.id
   );
@@ -217,6 +310,8 @@ export async function updateModel(
       model: input.id
     });
   }
+
+  await refreshEnabledModelCatalogCache(env, config);
 }
 
 export async function listApiTokens(env: Env): Promise<ApiTokenDescriptor[]> {

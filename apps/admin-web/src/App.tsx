@@ -5,6 +5,7 @@ import {
   deleteAdminToken,
   fetchAdminState,
   fetchAdminTokens,
+  fetchAdminUsage,
   fetchModels,
   fetchSession,
   fetchStatus,
@@ -20,7 +21,8 @@ import {
   type ChatCompletionResponse,
   type ModelListData,
   type SessionData,
-  type StatusData
+  type StatusData,
+  type UsageOverview
 } from './api';
 
 const capabilityCards = [
@@ -396,7 +398,7 @@ function ControlPlanePanel(props: {
   pending: boolean;
   onBootstrap: () => Promise<void>;
   onSaveSettings: (settings: AdminState['settings']) => Promise<void>;
-  onUpdateModel: (modelId: string, input: { label: string; enabled: boolean }) => Promise<void>;
+  onUpdateModel: (modelId: string, input: { label: string; enabled: boolean; upstreamProfileId: string }) => Promise<void>;
 }) {
   const { status, session, adminState, adminError, pending, onBootstrap, onSaveSettings, onUpdateModel } = props;
   const [publicAppName, setPublicAppName] = useState('');
@@ -480,6 +482,24 @@ function ControlPlanePanel(props: {
 
             <div className="stack">
               <h3 className="section-title">模型目录</h3>
+              <div className="profile-list">
+                {adminState.profiles.map((profile) => (
+                  <article className="profile-card" key={profile.id}>
+                    <strong>{profile.label}</strong>
+                    <span className="meta-text">
+                      {profile.id} / {profile.providerName}
+                      {profile.isDefault ? ' / default' : ''}
+                    </span>
+                    <span className="meta-text">{profile.supportedModelIds.join(', ') || 'no models declared'}</span>
+                    <span className="meta-text">
+                      assigned: {profile.assignedModelIds.join(', ') || 'none'}
+                    </span>
+                    <span className="meta-text">
+                      enabled: {profile.enabledAssignedModelIds.join(', ') || 'none'}
+                    </span>
+                  </article>
+                ))}
+              </div>
               {adminState.models.length === 0 ? (
                 <p className="meta-text">当前 D1 模型目录为空。</p>
               ) : (
@@ -488,6 +508,7 @@ function ControlPlanePanel(props: {
                     key={model.id}
                     disabled={pending}
                     model={model}
+                    profiles={adminState.profiles}
                     onSave={onUpdateModel}
                   />
                 ))
@@ -503,11 +524,15 @@ function ControlPlanePanel(props: {
 function ModelRowEditor(props: {
   model: AdminState['models'][number];
   disabled: boolean;
-  onSave: (modelId: string, input: { label: string; enabled: boolean }) => Promise<void>;
+  profiles: AdminState['profiles'];
+  onSave: (modelId: string, input: { label: string; enabled: boolean; upstreamProfileId: string }) => Promise<void>;
 }) {
-  const { model, disabled, onSave } = props;
+  const { model, disabled, profiles, onSave } = props;
+  const compatibleProfiles = profiles.filter((profile) => profile.supportedModelIds.includes(model.id));
+  const hasProfileDrift = model.upstreamProfileExists === false || model.upstreamProfileSupportsModel === false;
   const [label, setLabel] = useState(model.label ?? model.id);
   const [enabled, setEnabled] = useState(model.enabled ?? true);
+  const [upstreamProfileId, setUpstreamProfileId] = useState(model.upstreamProfileId ?? compatibleProfiles[0]?.id ?? '');
 
   useEffect(() => {
     setLabel(model.label ?? model.id);
@@ -517,6 +542,10 @@ function ModelRowEditor(props: {
     setEnabled(model.enabled ?? true);
   }, [model.enabled, model.id]);
 
+  useEffect(() => {
+    setUpstreamProfileId(model.upstreamProfileId ?? compatibleProfiles[0]?.id ?? '');
+  }, [compatibleProfiles, model.upstreamProfileId]);
+
   return (
     <form
       className="model-row"
@@ -524,7 +553,8 @@ function ModelRowEditor(props: {
         event.preventDefault();
         void onSave(model.id, {
           label,
-          enabled
+          enabled,
+          upstreamProfileId
         });
       }}
     >
@@ -536,6 +566,24 @@ function ModelRowEditor(props: {
           onChange={(event) => setLabel(event.target.value)}
           value={label}
         />
+        <select
+          className="input"
+          disabled={disabled || compatibleProfiles.length === 0}
+          onChange={(event) => setUpstreamProfileId(event.target.value)}
+          value={upstreamProfileId}
+        >
+          {compatibleProfiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {profile.label} / {profile.providerName}
+            </option>
+          ))}
+        </select>
+        {compatibleProfiles.length === 0 ? <span className="error-text">当前没有声明支持该模型的 upstream profile。</span> : null}
+        {hasProfileDrift ? (
+          <span className="error-text">
+            当前绑定的 upstream profile 已失效或不再声明支持该模型，保存后可修复。
+          </span>
+        ) : null}
       </div>
       <label className="checkbox-row">
         <input
@@ -546,10 +594,106 @@ function ModelRowEditor(props: {
         />
         <span>启用</span>
       </label>
-      <button className="action action-secondary" disabled={disabled} type="submit">
+      <button className="action action-secondary" disabled={disabled || compatibleProfiles.length === 0} type="submit">
         保存模型
       </button>
     </form>
+  );
+}
+
+function UsagePanel(props: {
+  session: SessionData | null;
+  usage: UsageOverview | null;
+  usageWindowDays: number;
+  usageError: string | null;
+  pending: boolean;
+  onReload: (days: number) => Promise<void>;
+}) {
+  const { session, usage, usageWindowDays, usageError, pending, onReload } = props;
+
+  if (!session?.authenticated) {
+    return null;
+  }
+
+  const rows = usage?.rows ?? [];
+
+  return (
+    <section className="panel panel-soft">
+      <div className="panel-header">
+        <h2>Usage Overview</h2>
+        <span className="badge">{usage?.totals.requestCount ?? 0} requests</span>
+      </div>
+      <div className="stack">
+        <div className="toolbar toolbar-wrap">
+          <div className="segmented">
+            {[7, 30].map((days) => (
+              <button
+                key={days}
+                className={`chip ${usageWindowDays === days ? 'chip-active' : ''}`}
+                disabled={pending}
+                onClick={() => void onReload(days)}
+                type="button"
+              >
+                近 {days} 天
+              </button>
+            ))}
+          </div>
+          <span className="meta-text">只保留 D1 日聚合，不写逐请求明细。</span>
+        </div>
+        {usageError ? <p className="error-text">{usageError}</p> : null}
+        {usage ? (
+          <div className="usage-summary-grid">
+            <article className="usage-summary-card">
+              <strong>{usage.totals.successCount}</strong>
+              <span>成功请求</span>
+            </article>
+            <article className="usage-summary-card">
+              <strong>{usage.totals.errorCount}</strong>
+              <span>失败请求</span>
+            </article>
+            <article className="usage-summary-card">
+              <strong>{usage.totals.activeActorCount}</strong>
+              <span>活跃调用方</span>
+            </article>
+            <article className="usage-summary-card">
+              <strong>{usage.totals.activeModelCount}</strong>
+              <span>活跃模型</span>
+            </article>
+          </div>
+        ) : null}
+        {rows.length === 0 ? (
+          <p className="meta-text">当前窗口内还没有 relay usage 聚合数据。</p>
+        ) : (
+          <div className="usage-table">
+            <div className="usage-table-head">
+              <span>日期</span>
+              <span>调用方</span>
+              <span>Profile</span>
+              <span>模型</span>
+              <span>请求</span>
+              <span>成功</span>
+              <span>失败</span>
+              <span>状态</span>
+            </div>
+            {rows.slice(0, 24).map((row) => (
+              <div key={`${row.usageDate}:${row.actorKind}:${row.actorId}:${row.model}`} className="usage-table-row">
+                <span>{row.usageDate}</span>
+                <span>
+                  {row.actorLabel}
+                  {row.actorLast4 ? ` / ****${row.actorLast4}` : ''}
+                </span>
+                <span>{row.upstreamProfileLabel}</span>
+                <span>{row.model}</span>
+                <span>{row.requestCount}</span>
+                <span>{row.successCount}</span>
+                <span>{row.errorCount}</span>
+                <span>{row.lastStatus}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -559,12 +703,15 @@ export function App() {
   const [models, setModels] = useState<ModelListData | null>(null);
   const [adminState, setAdminState] = useState<AdminState | null>(null);
   const [adminTokens, setAdminTokens] = useState<ApiTokenDescriptor[]>([]);
+  const [usage, setUsage] = useState<UsageOverview | null>(null);
+  const [usageWindowDays, setUsageWindowDays] = useState(7);
   const [latestCreatedToken, setLatestCreatedToken] = useState<ApiTokenCreateResult | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
+  const [usageError, setUsageError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatResult, setChatResult] = useState<ChatCompletionResponse | null>(null);
   const [pending, setPending] = useState(false);
@@ -609,12 +756,32 @@ export function App() {
     }
   }
 
+  async function refreshAdminUsage(nextSession?: SessionData | null, windowDays = usageWindowDays) {
+    const currentSession = nextSession ?? session;
+    if (!currentSession?.authenticated) {
+      setUsage(null);
+      setUsageError(null);
+      return;
+    }
+
+    setUsageError(null);
+    try {
+      const nextUsage = await fetchAdminUsage(windowDays);
+      setUsage(nextUsage);
+      setUsageWindowDays(windowDays);
+    } catch (cause) {
+      setUsage(null);
+      setUsageError(cause instanceof Error ? cause.message : 'failed to load usage overview');
+    }
+  }
+
   async function refresh() {
     const [nextStatus, nextSession] = await Promise.all([fetchStatus(), fetchSession()]);
     setStatus(nextStatus);
     setSession(nextSession);
     await refreshAdminState(nextSession);
     await refreshAdminTokens(nextSession);
+    await refreshAdminUsage(nextSession);
   }
 
   async function loadModels() {
@@ -660,7 +827,7 @@ export function App() {
     }
   }
 
-  async function handleUpdateModel(modelId: string, input: { label: string; enabled: boolean }) {
+  async function handleUpdateModel(modelId: string, input: { label: string; enabled: boolean; upstreamProfileId: string }) {
     setPending(true);
     setAdminError(null);
     try {
@@ -709,9 +876,11 @@ export function App() {
     try {
       const result = await sendChatCompletion(input);
       setChatResult(result);
+      await refreshAdminUsage();
     } catch (cause) {
       setChatResult(null);
       setChatError(cause instanceof Error ? cause.message : 'chat request failed');
+      await refreshAdminUsage();
     } finally {
       setPending(false);
     }
@@ -737,6 +906,7 @@ export function App() {
     try {
       await updateAdminToken(tokenId, input);
       await refreshAdminTokens();
+      await refreshAdminUsage();
     } catch (cause) {
       setTokenError(cause instanceof Error ? cause.message : 'update token failed');
     } finally {
@@ -750,6 +920,7 @@ export function App() {
     try {
       await deleteAdminToken(tokenId);
       await refreshAdminTokens();
+      await refreshAdminUsage();
     } catch (cause) {
       setTokenError(cause instanceof Error ? cause.message : 'delete token failed');
     } finally {
@@ -770,22 +941,12 @@ export function App() {
         setStatus(nextStatus);
         setSession(nextSession);
         if (nextSession.authenticated) {
-          try {
-            const nextAdminState = await fetchAdminState();
-            const tokenPayload = await fetchAdminTokens();
-            if (!cancelled) {
-              setAdminState(nextAdminState);
-              setAdminTokens(tokenPayload.data);
-              setModels({
-                object: 'list',
-                stateStore: nextAdminState.stateStore,
-                data: nextAdminState.models
-              });
-            }
-          } catch (cause) {
-            if (!cancelled) {
-              setAdminError(cause instanceof Error ? cause.message : 'failed to load admin state');
-            }
+          if (!cancelled) {
+            await Promise.all([
+              refreshAdminState(nextSession),
+              refreshAdminTokens(nextSession),
+              refreshAdminUsage(nextSession, usageWindowDays)
+            ]);
           }
         } else {
           try {
@@ -887,6 +1048,15 @@ export function App() {
           tokens={adminTokens}
         />
       </div>
+
+      <UsagePanel
+        onReload={(days) => refreshAdminUsage(undefined, days)}
+        pending={pending}
+        session={session}
+        usage={usage}
+        usageError={usageError}
+        usageWindowDays={usageWindowDays}
+      />
 
       <section className="grid">
         {capabilityCards.map((item) => (

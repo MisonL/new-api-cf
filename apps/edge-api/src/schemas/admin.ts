@@ -8,6 +8,6 @@ export const controlSettingsSchema = z.object({
 
 export const updateModelSchema = z.object({
   label: z.string().min(1).max(120),
-  enabled: z.boolean()
+  enabled: z.boolean(),
+  upstreamProfileId: z.string().min(1).max(120)
 });
-

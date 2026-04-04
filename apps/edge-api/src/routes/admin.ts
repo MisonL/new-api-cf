@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getRuntimeConfig } from '../lib/config';
+import { getRuntimeConfig, getUpstreamProfileById, profileSupportsModel } from '../lib/config';
 import {
   bootstrapControlPlane,
   createApiToken,
@@ -13,8 +13,22 @@ import {
 import { requireAdmin } from '../lib/auth';
 import { ok } from '../lib/http';
 import { ApiError } from '../lib/errors';
+import { getUsageOverview } from '../lib/usage';
 import { controlSettingsSchema, updateModelSchema } from '../schemas/admin';
 import { createTokenSchema, updateTokenSchema } from '../schemas/token';
+
+function parseWindowDays(rawValue: string | undefined): number {
+  if (!rawValue) {
+    return 7;
+  }
+
+  const windowDays = Number(rawValue);
+  if (!Number.isInteger(windowDays) || windowDays < 1 || windowDays > 30) {
+    throw new ApiError(400, 'INVALID_USAGE_WINDOW', 'usage days must be an integer between 1 and 30');
+  }
+
+  return windowDays;
+}
 
 export function createAdminRouter() {
   const router = new Hono<{ Bindings: Env }>();
@@ -51,10 +65,24 @@ export function createAdminRouter() {
       throw new ApiError(400, 'INVALID_JSON', 'request body must be valid JSON');
     });
     const input = updateModelSchema.parse(payload);
-    await updateModel(c.env, {
+    const upstreamProfile = getUpstreamProfileById(config, input.upstreamProfileId);
+    if (!upstreamProfile) {
+      throw new ApiError(400, 'INVALID_UPSTREAM_PROFILE', 'upstream profile does not exist', {
+        upstreamProfileId: input.upstreamProfileId
+      });
+    }
+    if (!profileSupportsModel(config, input.upstreamProfileId, c.req.param('id'))) {
+      throw new ApiError(400, 'MODEL_PROFILE_MISMATCH', 'selected upstream profile does not declare this model', {
+        model: c.req.param('id'),
+        upstreamProfileId: input.upstreamProfileId
+      });
+    }
+    await updateModel(c.env, config, {
       id: c.req.param('id'),
       label: input.label,
-      enabled: input.enabled
+      enabled: input.enabled,
+      provider: upstreamProfile.providerName,
+      upstreamProfileId: input.upstreamProfileId
     });
     return ok(c, {
       saved: true
@@ -67,6 +95,13 @@ export function createAdminRouter() {
     return ok(c, {
       data: await listApiTokens(c.env)
     });
+  });
+
+  router.get('/api/admin/usage', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    await requireAdmin(c, config);
+    const windowDays = parseWindowDays(c.req.query('days'));
+    return ok(c, await getUsageOverview(c.env, config, windowDays));
   });
 
   router.post('/api/admin/tokens', async (c) => {
