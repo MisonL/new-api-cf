@@ -66,3 +66,17 @@ export interface ChatCompletionRequestShape {
   top_p?: number;
   max_tokens?: number;
 }
+
+export interface ChatCompletionChoice {
+  index: number;
+  message: ChatMessage;
+  finish_reason?: string | null;
+}
+
+export interface ChatCompletionResponseShape {
+  id: string;
+  object: 'chat.completion';
+  created: number;
+  model: string;
+  choices: ChatCompletionChoice[];
+}

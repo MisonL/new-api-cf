@@ -48,16 +48,39 @@ export async function forwardChatCompletion(
   assertModelAllowed(request.model, config);
 
   const baseUrl = normalizeBaseUrl(config.upstreamBaseUrl!);
-  const upstreamResponse = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: getUpstreamHeaders(config.upstreamApiKey!),
-    body: JSON.stringify(request)
-  });
+  const abortController = new AbortController();
+  const timeoutHandle = setTimeout(() => abortController.abort(), config.upstreamTimeoutMs);
+  let upstreamResponse: Response;
+
+  try {
+    upstreamResponse = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: getUpstreamHeaders(config.upstreamApiKey!),
+      body: JSON.stringify(request),
+      signal: abortController.signal
+    });
+  } catch (cause) {
+    if (abortController.signal.aborted) {
+      throw new ApiError(504, 'UPSTREAM_TIMEOUT', 'upstream request timed out', {
+        timeoutMs: config.upstreamTimeoutMs
+      });
+    }
+
+    throw new ApiError(502, 'UPSTREAM_FETCH_FAILED', 'failed to reach upstream provider', {
+      message: cause instanceof Error ? cause.message : String(cause)
+    });
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
 
   const responseHeaders = new Headers();
   const contentType = upstreamResponse.headers.get('content-type');
   if (contentType) {
     responseHeaders.set('content-type', contentType);
+  }
+  const upstreamRequestId = upstreamResponse.headers.get('x-request-id');
+  if (upstreamRequestId) {
+    responseHeaders.set('x-upstream-request-id', upstreamRequestId);
   }
 
   return new Response(upstreamResponse.body, {
@@ -65,4 +88,3 @@ export async function forwardChatCompletion(
     headers: responseHeaders
   });
 }
-

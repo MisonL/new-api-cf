@@ -3,14 +3,17 @@ import type { ApiErrorPayload } from '../../../../packages/shared/src/contracts'
 export type ApiStatusCode =
   | 400
   | 401
+  | 402
   | 403
   | 404
   | 409
   | 422
   | 429
+  | 502
   | 500
   | 501
-  | 503;
+  | 503
+  | 504;
 
 export class ApiError extends Error {
   readonly status: ApiStatusCode;

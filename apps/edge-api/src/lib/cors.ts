@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
 import { getRuntimeConfig } from './config';
+import type { AppEnv } from './types';
 
 function isAllowedOrigin(requestOrigin: string, allowedOrigins: string[]) {
   return allowedOrigins.includes('*') || allowedOrigins.includes(requestOrigin);
@@ -13,7 +14,7 @@ function applyCorsHeaders(c: Context, requestOrigin: string) {
   c.header('Vary', 'Origin');
 }
 
-export async function corsMiddleware(c: Context<{ Bindings: Env }>, next: Next) {
+export async function corsMiddleware(c: Context<AppEnv>, next: Next) {
   const requestOrigin = c.req.header('Origin');
   const config = getRuntimeConfig(c.env);
 

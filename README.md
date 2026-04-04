@@ -29,7 +29,9 @@
   - `POST /v1/chat/completions`
 - `apps/admin-web`
   - React + Vite 前端骨架
-  - 读取同域 `/api/status`
+  - 登录面板
+  - 模型列表读取
+  - 最小 chat playground
 - `packages/shared`
   - 共享 DTO、错误模型和最小 relay 契约
 
@@ -39,6 +41,9 @@
 - 若未配置上游环境变量，`/api/models` 和 `/v1/chat/completions` 会显式失败
 - 若使用 `AUTH_MODE=session`，可通过 admin token 登录换取 HMAC 签名 cookie
 - 若前端与 Worker 分域部署，需显式配置 `CORS_ORIGIN`
+- Worker 会为每个请求生成 `x-request-id`
+- relay 会透传上游 `x-request-id` 到 `x-upstream-request-id`
+- relay 支持 `UPSTREAM_TIMEOUT_MS`，默认 `30000`
 - 当前未引入 D1 / KV / Durable Objects / Queues 绑定，仍处于 Phase 1 骨架态
 
 ## 开发命令
@@ -55,6 +60,7 @@ bun run check
 - `ADMIN_BEARER_TOKEN=<token>`
 - `SESSION_SECRET=<32+ chars secret>`
 - `CORS_ORIGIN=http://127.0.0.1:4173,https://admin.example.com`
+- `UPSTREAM_TIMEOUT_MS=30000`
 - `OPENAI_BASE_URL=<https://.../v1>`
 - `OPENAI_API_KEY=<key>`
 - `OPENAI_MODEL_ALLOWLIST=gpt-4o-mini,gpt-4.1-mini`

@@ -8,6 +8,7 @@ const envSchema = z.object({
   ADMIN_BEARER_TOKEN: z.string().optional(),
   SESSION_SECRET: z.string().min(32).optional(),
   CORS_ORIGIN: z.string().optional(),
+  UPSTREAM_TIMEOUT_MS: z.coerce.number().int().positive().max(120000).optional(),
   OPENAI_BASE_URL: z.string().url().optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL_ALLOWLIST: z.string().optional(),
@@ -32,6 +33,7 @@ export type RuntimeConfig = {
   adminBearerToken?: string;
   sessionSecret?: string;
   corsOrigins: string[];
+  upstreamTimeoutMs: number;
   upstreamBaseUrl?: string;
   upstreamApiKey?: string;
   upstreamProviderName: string;
@@ -48,6 +50,7 @@ export function getRuntimeConfig(env: unknown): RuntimeConfig {
     adminBearerToken: parsed.ADMIN_BEARER_TOKEN,
     sessionSecret: parsed.SESSION_SECRET,
     corsOrigins: parseCsvList(parsed.CORS_ORIGIN),
+    upstreamTimeoutMs: parsed.UPSTREAM_TIMEOUT_MS ?? 30000,
     upstreamBaseUrl: parsed.OPENAI_BASE_URL,
     upstreamApiKey: parsed.OPENAI_API_KEY,
     upstreamProviderName: parsed.OPENAI_PROVIDER_NAME || 'openai-compatible',

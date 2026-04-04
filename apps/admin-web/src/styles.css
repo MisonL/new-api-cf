@@ -109,6 +109,10 @@ body {
   margin-top: 24px;
 }
 
+.grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .card {
   padding: 22px;
   border-radius: 22px;
@@ -147,6 +151,12 @@ body {
   color: #142018;
 }
 
+.textarea {
+  min-height: 120px;
+  resize: vertical;
+  font: inherit;
+}
+
 .action {
   width: fit-content;
   min-width: 120px;
@@ -158,6 +168,12 @@ body {
   cursor: pointer;
 }
 
+.action-secondary {
+  background: #edf5ef;
+  color: #163b22;
+  border: 1px solid rgba(20, 32, 24, 0.12);
+}
+
 .action:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -166,6 +182,23 @@ body {
 .error-text {
   margin: 16px 0 0;
   color: #b42318;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.meta-text {
+  font-size: 13px;
+  color: #4a6751;
+}
+
+.status-block-soft {
+  background: rgba(20, 32, 24, 0.04);
+  color: #142018;
 }
 
 @media (max-width: 900px) {

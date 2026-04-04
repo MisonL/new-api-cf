@@ -20,6 +20,7 @@ export type StatusData = {
   upstreamConfigured: boolean;
   loginAvailable: boolean;
   corsEnabled: boolean;
+  upstreamTimeoutMs: number;
   endpoints: {
     admin: string[];
     openaiCompatible: string[];
@@ -31,6 +32,31 @@ export type SessionData = {
   authMode: 'disabled' | 'bearer' | 'session';
   userId?: string;
   role?: 'admin';
+};
+
+export type ModelListData = {
+  object: 'list';
+  data: Array<{
+    id: string;
+    provider: 'openai-compatible';
+    object: 'model';
+    ownedBy: string;
+  }>;
+};
+
+export type ChatCompletionResponse = {
+  id: string;
+  object: 'chat.completion';
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    message: {
+      role: 'assistant' | 'system' | 'user' | 'tool';
+      content: string;
+    };
+    finish_reason?: string | null;
+  }>;
 };
 
 const EDGE_API_BASE_URL = import.meta.env.VITE_EDGE_API_BASE_URL ?? '';
@@ -79,5 +105,39 @@ export function logout() {
   return request<{ authenticated: boolean }>('/api/auth/logout', {
     method: 'POST',
     body: JSON.stringify({})
+  });
+}
+
+export function fetchModels() {
+  return request<ModelListData>('/api/models', {
+    method: 'GET'
+  });
+}
+
+export function sendChatCompletion(input: {
+  model: string;
+  prompt: string;
+  systemPrompt?: string;
+}) {
+  const messages = [];
+
+  if (input.systemPrompt && input.systemPrompt.trim().length > 0) {
+    messages.push({
+      role: 'system' as const,
+      content: input.systemPrompt.trim()
+    });
+  }
+
+  messages.push({
+    role: 'user' as const,
+    content: input.prompt.trim()
+  });
+
+  return request<ChatCompletionResponse>('/v1/chat/completions', {
+    method: 'POST',
+    body: JSON.stringify({
+      model: input.model,
+      messages
+    })
   });
 }

@@ -6,12 +6,15 @@ import { createModelRouter } from './routes/models';
 import { createRootRouter } from './routes/root';
 import { createStatusRouter } from './routes/status';
 import { corsMiddleware } from './lib/cors';
+import { requestIdMiddleware } from './lib/request-id';
 import { ApiError } from './lib/errors';
 import { fail } from './lib/http';
+import type { AppEnv } from './lib/types';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<AppEnv>();
 
 app.use('*', corsMiddleware);
+app.use('*', requestIdMiddleware);
 
 app.route('/', createRootRouter());
 app.route('/', createStatusRouter());
@@ -34,6 +37,7 @@ app.onError((cause, c) => {
     JSON.stringify({
       level: 'error',
       message: 'unhandled worker exception',
+      requestId: c.get('requestId'),
       error: cause instanceof Error ? cause.message : String(cause)
     })
   );

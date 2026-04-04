@@ -17,6 +17,7 @@ export function createStatusRouter() {
       upstreamConfigured: isUpstreamConfigured(config),
       loginAvailable: config.authMode === 'session',
       corsEnabled: config.corsOrigins.length > 0,
+      upstreamTimeoutMs: config.upstreamTimeoutMs,
       endpoints: {
         admin: ['/api/auth/session', '/api/auth/login', '/api/auth/logout', '/api/me', '/api/models'],
         openaiCompatible: ['/v1/models', '/v1/chat/completions']

@@ -1,5 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { fetchSession, fetchStatus, login, logout, type SessionData, type StatusData } from './api';
+import {
+  fetchModels,
+  fetchSession,
+  fetchStatus,
+  login,
+  logout,
+  sendChatCompletion,
+  type ChatCompletionResponse,
+  type ModelListData,
+  type SessionData,
+  type StatusData
+} from './api';
 
 const capabilityCards = [
   {
@@ -11,8 +22,8 @@ const capabilityCards = [
     body: '支持最小 admin token 登录换取签名 cookie，会话由 Worker 使用 HMAC 进行校验。'
   },
   {
-    title: 'Cloudflare Guardrails',
-    body: '继续保持 Worker-first、轻状态、显式错误，不用静默降级掩盖未实现能力。'
+    title: 'Request Guardrails',
+    body: 'Worker 现在具备 request id 和上游超时控制，便于后续接入日志、限流和审计。'
   }
 ];
 
@@ -92,17 +103,133 @@ function SessionPanel(props: {
   );
 }
 
+function PlaygroundPanel(props: {
+  status: StatusData | null;
+  models: ModelListData | null;
+  modelsError: string | null;
+  pending: boolean;
+  chatResult: ChatCompletionResponse | null;
+  chatError: string | null;
+  onReloadModels: () => Promise<void>;
+  onSend: (input: { model: string; prompt: string; systemPrompt: string }) => Promise<void>;
+}) {
+  const { status, models, modelsError, pending, chatResult, chatError, onReloadModels, onSend } = props;
+  const [model, setModel] = useState('');
+  const [prompt, setPrompt] = useState('用一句话说明你是一个 Cloudflare 上运行的最小 AI 网关。');
+  const [systemPrompt, setSystemPrompt] = useState('你是一个简洁的系统说明助手。');
+
+  useEffect(() => {
+    if (!model && models && models.data.length > 0) {
+      setModel(models.data[0].id);
+    }
+  }, [model, models]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSend({
+      model,
+      prompt,
+      systemPrompt
+    });
+  }
+
+  if (!status) {
+    return null;
+  }
+
+  return (
+    <section className="panel panel-soft">
+      <div className="panel-header">
+        <h2>Relay Playground</h2>
+        <span className={`badge ${status.upstreamConfigured ? '' : 'badge-error'}`}>
+          {status.upstreamConfigured ? 'upstream ready' : 'upstream missing'}
+        </span>
+      </div>
+      <div className="stack">
+        <div className="toolbar">
+          <button className="action action-secondary" disabled={pending} onClick={() => void onReloadModels()} type="button">
+            刷新模型
+          </button>
+          <span className="meta-text">timeout {status.upstreamTimeoutMs} ms</span>
+        </div>
+        {modelsError ? <p className="error-text">{modelsError}</p> : null}
+        <form className="stack" onSubmit={(event) => void handleSubmit(event)}>
+          <label className="label" htmlFor="model-select">
+            模型
+          </label>
+          <select
+            id="model-select"
+            className="input"
+            disabled={pending || !models || models.data.length === 0}
+            onChange={(event) => setModel(event.target.value)}
+            value={model}
+          >
+            <option value="">请选择模型</option>
+            {(models?.data ?? []).map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.id}
+              </option>
+            ))}
+          </select>
+          <label className="label" htmlFor="system-prompt">
+            System Prompt
+          </label>
+          <textarea
+            id="system-prompt"
+            className="input textarea"
+            disabled={pending}
+            onChange={(event) => setSystemPrompt(event.target.value)}
+            value={systemPrompt}
+          />
+          <label className="label" htmlFor="user-prompt">
+            User Prompt
+          </label>
+          <textarea
+            id="user-prompt"
+            className="input textarea"
+            disabled={pending}
+            onChange={(event) => setPrompt(event.target.value)}
+            value={prompt}
+          />
+          <button className="action" disabled={pending || !model || prompt.trim().length === 0} type="submit">
+            {pending ? '请求中...' : '发送请求'}
+          </button>
+        </form>
+        {chatError ? <p className="error-text">{chatError}</p> : null}
+        <pre className="status-block status-block-soft">
+          {JSON.stringify(chatResult ?? { message: '尚未发送请求' }, null, 2)}
+        </pre>
+      </div>
+    </section>
+  );
+}
+
 export function App() {
   const [status, setStatus] = useState<StatusData | null>(null);
   const [session, setSession] = useState<SessionData | null>(null);
+  const [models, setModels] = useState<ModelListData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [chatResult, setChatResult] = useState<ChatCompletionResponse | null>(null);
   const [pending, setPending] = useState(false);
 
   async function refresh() {
     const [nextStatus, nextSession] = await Promise.all([fetchStatus(), fetchSession()]);
     setStatus(nextStatus);
     setSession(nextSession);
+  }
+
+  async function loadModels() {
+    setModelsError(null);
+    try {
+      const nextModels = await fetchModels();
+      setModels(nextModels);
+    } catch (cause) {
+      setModels(null);
+      setModelsError(cause instanceof Error ? cause.message : 'failed to load models');
+    }
   }
 
   async function handleLogin(token: string) {
@@ -121,11 +248,27 @@ export function App() {
   async function handleLogout() {
     setPending(true);
     setActionError(null);
+    setChatError(null);
     try {
       await logout();
+      setChatResult(null);
       await refresh();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : 'logout failed');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleSend(input: { model: string; prompt: string; systemPrompt: string }) {
+    setPending(true);
+    setChatError(null);
+    try {
+      const result = await sendChatCompletion(input);
+      setChatResult(result);
+    } catch (cause) {
+      setChatResult(null);
+      setChatError(cause instanceof Error ? cause.message : 'chat request failed');
     } finally {
       setPending(false);
     }
@@ -137,9 +280,22 @@ export function App() {
     void (async () => {
       try {
         const [nextStatus, nextSession] = await Promise.all([fetchStatus(), fetchSession()]);
-        if (!cancelled) {
-          setStatus(nextStatus);
-          setSession(nextSession);
+        if (cancelled) {
+          return;
+        }
+
+        setStatus(nextStatus);
+        setSession(nextSession);
+
+        try {
+          const nextModels = await fetchModels();
+          if (!cancelled) {
+            setModels(nextModels);
+          }
+        } catch (cause) {
+          if (!cancelled) {
+            setModelsError(cause instanceof Error ? cause.message : 'failed to load models');
+          }
         }
       } catch (cause) {
         if (!cancelled) {
@@ -159,7 +315,7 @@ export function App() {
         <p className="eyebrow">Cloudflare Worker-first Skeleton</p>
         <h1>new-api-cf</h1>
         <p className="lede">
-          面向 10 人以内并发场景的 Cloudflare Free 版统一 AI 网关，当前已补最小 session 登录闭环。
+          面向 10 人以内并发场景的 Cloudflare Free 版统一 AI 网关，当前已具备登录、模型读取和最小 chat playground。
         </p>
       </section>
 
@@ -174,7 +330,8 @@ export function App() {
             status
               ? {
                   ...status,
-                  session
+                  session,
+                  modelCount: models?.data.length ?? 0
                 }
               : { message: loadError ?? 'loading' },
             null,
@@ -183,14 +340,26 @@ export function App() {
         </pre>
       </section>
 
-      <SessionPanel
-        actionError={actionError}
-        onLogin={handleLogin}
-        onLogout={handleLogout}
-        pending={pending}
-        session={session}
-        status={status}
-      />
+      <div className="grid grid-two">
+        <SessionPanel
+          actionError={actionError}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+          pending={pending}
+          session={session}
+          status={status}
+        />
+        <PlaygroundPanel
+          chatError={chatError}
+          chatResult={chatResult}
+          models={models}
+          modelsError={modelsError}
+          onReloadModels={loadModels}
+          onSend={handleSend}
+          pending={pending}
+          status={status}
+        />
+      </div>
 
       <section className="grid">
         {capabilityCards.map((item) => (
