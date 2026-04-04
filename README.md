@@ -70,6 +70,10 @@
   - Queue consumer 在同一个 Worker 内批量聚合写回 D1
   - 未绑定 Queue 时，继续走当前同步 D1 兜底
   - 这样可以把 usage 聚合逐步从主链移出，而不改变当前接口行为
+- 若绑定 `RELAY_LIMITER` Durable Object 且配置 `RELAY_RATE_LIMIT_PER_MINUTE`：
+  - `/v1/chat/completions` 会按调用方执行每分钟速率门禁
+  - 当前调用方粒度为 `admin-session` 或 `api-token`
+  - 配置了速率上限但未绑定 DO 时会显式失败，不做静默绕过
 - `/api/admin/usage` 提供近 1 到 30 天的 D1 usage 日聚合视图：
   - 按 `usage_date + actor + upstream profile + model` 聚合
   - 当前只记录请求数、成功数、失败数和最近状态码
@@ -104,6 +108,8 @@ bun run --cwd apps/edge-api d1:migrate:local
 - `UPSTREAM_DEFAULT_PROFILE_ID=primary`
 - `MODEL_CATALOG_CACHE=<optional KV binding>`
 - `USAGE_EVENTS=<optional Queue binding>`
+- `RELAY_LIMITER=<optional Durable Object binding>`
+- `RELAY_RATE_LIMIT_PER_MINUTE=60`
 - `VITE_EDGE_API_BASE_URL=https://edge.example.com`
 
 说明：

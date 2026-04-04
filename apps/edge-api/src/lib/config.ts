@@ -9,6 +9,7 @@ const envSchema = z.object({
   SESSION_SECRET: z.string().min(32).optional(),
   CORS_ORIGIN: z.string().optional(),
   UPSTREAM_TIMEOUT_MS: z.coerce.number().int().positive().max(120000).optional(),
+  RELAY_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().max(600).optional(),
   OPENAI_BASE_URL: z.string().url().optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL_ALLOWLIST: z.string().optional(),
@@ -45,6 +46,7 @@ export type RuntimeConfig = {
   sessionSecret?: string;
   corsOrigins: string[];
   upstreamTimeoutMs: number;
+  relayRateLimitPerMinute?: number;
   upstreamBaseUrl?: string;
   upstreamApiKey?: string;
   upstreamProviderName: string;
@@ -177,6 +179,7 @@ export function getRuntimeConfig(env: unknown): RuntimeConfig {
     sessionSecret: parsed.SESSION_SECRET,
     corsOrigins: parseCsvList(parsed.CORS_ORIGIN),
     upstreamTimeoutMs: parsed.UPSTREAM_TIMEOUT_MS ?? 30000,
+    relayRateLimitPerMinute: parsed.RELAY_RATE_LIMIT_PER_MINUTE,
     upstreamBaseUrl: defaultProfile?.baseUrl,
     upstreamApiKey: defaultProfile?.apiKey,
     upstreamProviderName: defaultProfile?.providerName || 'openai-compatible',

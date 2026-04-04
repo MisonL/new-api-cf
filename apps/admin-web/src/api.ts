@@ -21,11 +21,13 @@ export type StatusData = {
   loginAvailable: boolean;
   corsEnabled: boolean;
   upstreamTimeoutMs: number;
+  relayRateLimitPerMinute?: number;
   stateStore: 'env' | 'd1';
   modelCount: number;
   d1Configured: boolean;
   kvConfigured?: boolean;
   queueConfigured?: boolean;
+  durableObjectConfigured?: boolean;
   endpoints: {
     admin: string[];
     openaiCompatible: string[];

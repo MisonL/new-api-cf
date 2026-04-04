@@ -11,6 +11,7 @@ import { requestIdMiddleware } from './lib/request-id';
 import { ApiError } from './lib/errors';
 import { fail } from './lib/http';
 import type { AppEnv } from './lib/types';
+import { RelayRateLimiterDO } from './lib/relay-rate-limit';
 import { consumeUsageQueue } from './lib/usage-queue';
 
 const app = new Hono<AppEnv>();
@@ -54,3 +55,5 @@ export default {
     await consumeUsageQueue(batch, env);
   }
 };
+
+export { RelayRateLimiterDO };

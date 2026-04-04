@@ -4,6 +4,7 @@ import { getRuntimeConfig } from '../lib/config';
 import { forwardChatCompletion } from '../lib/upstream';
 import { ApiError } from '../lib/errors';
 import { requireRelayAccess } from '../lib/relay-auth';
+import { enforceRelayRateLimit } from '../lib/relay-rate-limit';
 
 export function createChatRouter() {
   const router = new Hono<{ Bindings: Env }>();
@@ -15,6 +16,7 @@ export function createChatRouter() {
     const request = chatCompletionRequestSchema.parse(payload);
     const config = getRuntimeConfig(c.env);
     const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     return forwardChatCompletion(c.env, request, config, access);
   });
 

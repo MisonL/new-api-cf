@@ -3,6 +3,7 @@ import { getRuntimeConfig, isUpstreamConfigured } from '../lib/config';
 import { ok } from '../lib/http';
 import { getEnabledModels } from '../lib/control-plane';
 import { isModelCatalogCacheConfigured } from '../lib/model-catalog-cache';
+import { isRelayLimiterConfigured } from '../lib/relay-rate-limit';
 import { isUsageQueueConfigured } from '../lib/usage-queue';
 
 export function createStatusRouter() {
@@ -25,11 +26,13 @@ export function createStatusRouter() {
       loginAvailable: config.authMode === 'session',
       corsEnabled: config.corsOrigins.length > 0,
       upstreamTimeoutMs: config.upstreamTimeoutMs,
+      relayRateLimitPerMinute: config.relayRateLimitPerMinute ?? 0,
       stateStore: modelState.stateStore,
       modelCount: modelState.models.length,
       d1Configured: Boolean(c.env.DB),
       kvConfigured: isModelCatalogCacheConfigured(c.env),
       queueConfigured: isUsageQueueConfigured(c.env),
+      durableObjectConfigured: isRelayLimiterConfigured(c.env),
       endpoints: {
         admin: ['/api/auth/session', '/api/auth/login', '/api/auth/logout', '/api/admin/state', '/api/admin/bootstrap', '/api/admin/settings', '/api/admin/tokens', '/api/admin/usage', '/api/me', '/api/models'],
         openaiCompatible: ['/v1/models', '/v1/chat/completions']
