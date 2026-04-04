@@ -94,6 +94,14 @@ export interface ResponseCreateRequestShape {
   [key: string]: unknown;
 }
 
+export interface EmbeddingsCreateRequestShape {
+  model: string;
+  input: string | string[] | number[] | number[][];
+  dimensions?: number;
+  encoding_format?: 'float' | 'base64';
+  user?: string;
+}
+
 export type StateStoreKind = 'env' | 'd1';
 
 export interface ControlSettingValues {

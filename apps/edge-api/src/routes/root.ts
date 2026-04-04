@@ -22,6 +22,7 @@ export function createRootRouter() {
         '/api/models',
         '/v1/models',
         '/v1/chat/completions',
+        '/v1/embeddings',
         '/v1/responses'
       ]
     });

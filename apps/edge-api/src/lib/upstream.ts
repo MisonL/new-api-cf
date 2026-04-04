@@ -1,5 +1,6 @@
 import type {
   ChatCompletionRequestShape,
+  EmbeddingsCreateRequestShape,
   ModelDescriptor,
   ResponseCreateRequestShape,
   StateStoreKind
@@ -97,6 +98,15 @@ export async function forwardResponseCreate(
   access: RelayAccessContext
 ): Promise<Response> {
   return forwardOpenAiRequest(env, '/responses', request.model, request, config, access);
+}
+
+export async function forwardEmbeddingsCreate(
+  env: Env,
+  request: EmbeddingsCreateRequestShape,
+  config: RuntimeConfig,
+  access: RelayAccessContext
+): Promise<Response> {
+  return forwardOpenAiRequest(env, '/embeddings', request.model, request, config, access);
 }
 
 async function forwardOpenAiRequest(

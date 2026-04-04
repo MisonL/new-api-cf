@@ -35,7 +35,7 @@ export function createStatusRouter() {
       durableObjectConfigured: isRelayLimiterConfigured(c.env),
       endpoints: {
         admin: ['/api/auth/session', '/api/auth/login', '/api/auth/logout', '/api/admin/state', '/api/admin/bootstrap', '/api/admin/settings', '/api/admin/tokens', '/api/admin/usage', '/api/me', '/api/models'],
-        openaiCompatible: ['/v1/models', '/v1/chat/completions', '/v1/responses']
+        openaiCompatible: ['/v1/models', '/v1/chat/completions', '/v1/embeddings', '/v1/responses']
       }
     });
   });
