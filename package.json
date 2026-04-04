@@ -1,7 +1,7 @@
 {
   "name": "new-api-cf",
   "private": true,
-  "packageManager": "bun@1.2.21",
+  "packageManager": "bun@1.3.9",
   "workspaces": [
     "apps/*",
     "packages/*"

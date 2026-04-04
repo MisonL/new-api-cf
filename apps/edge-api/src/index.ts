@@ -5,10 +5,13 @@ import { createChatRouter } from './routes/chat';
 import { createModelRouter } from './routes/models';
 import { createRootRouter } from './routes/root';
 import { createStatusRouter } from './routes/status';
+import { corsMiddleware } from './lib/cors';
 import { ApiError } from './lib/errors';
 import { fail } from './lib/http';
 
 const app = new Hono<{ Bindings: Env }>();
+
+app.use('*', corsMiddleware);
 
 app.route('/', createRootRouter());
 app.route('/', createStatusRouter());
@@ -39,4 +42,3 @@ app.onError((cause, c) => {
 });
 
 export default app;
-

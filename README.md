@@ -21,8 +21,11 @@
   - `GET /`
   - `GET /api/status`
   - `GET /api/auth/session`
+  - `POST /api/auth/login`
+  - `POST /api/auth/logout`
   - `GET /api/me`
   - `GET /api/models`
+  - `GET /v1/models`
   - `POST /v1/chat/completions`
 - `apps/admin-web`
   - React + Vite 前端骨架
@@ -34,6 +37,8 @@
 
 - 当前 relay 只支持 OpenAI-compatible 上游
 - 若未配置上游环境变量，`/api/models` 和 `/v1/chat/completions` 会显式失败
+- 若使用 `AUTH_MODE=session`，可通过 admin token 登录换取 HMAC 签名 cookie
+- 若前端与 Worker 分域部署，需显式配置 `CORS_ORIGIN`
 - 当前未引入 D1 / KV / Durable Objects / Queues 绑定，仍处于 Phase 1 骨架态
 
 ## 开发命令
@@ -46,12 +51,15 @@ bun run check
 
 环境变量：
 
-- `AUTH_MODE=disabled|bearer`
+- `AUTH_MODE=disabled|bearer|session`
 - `ADMIN_BEARER_TOKEN=<token>`
+- `SESSION_SECRET=<32+ chars secret>`
+- `CORS_ORIGIN=http://127.0.0.1:4173,https://admin.example.com`
 - `OPENAI_BASE_URL=<https://.../v1>`
 - `OPENAI_API_KEY=<key>`
 - `OPENAI_MODEL_ALLOWLIST=gpt-4o-mini,gpt-4.1-mini`
 - `OPENAI_PROVIDER_NAME=<provider-name>`
+- `VITE_EDGE_API_BASE_URL=https://edge.example.com`
 
 ## 目录结构
 

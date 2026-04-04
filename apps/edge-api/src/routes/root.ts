@@ -11,8 +11,11 @@ export function createRootRouter() {
       routes: [
         '/api/status',
         '/api/auth/session',
+        '/api/auth/login',
+        '/api/auth/logout',
         '/api/me',
         '/api/models',
+        '/v1/models',
         '/v1/chat/completions'
       ]
     });
@@ -20,4 +23,3 @@ export function createRootRouter() {
 
   return router;
 }
-

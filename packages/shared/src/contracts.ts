@@ -31,11 +31,17 @@ export interface ApiSuccessPayload<T> {
   data: T;
 }
 
+export type AuthMode = 'disabled' | 'bearer' | 'session';
+
 export interface SessionInfo {
   authenticated: boolean;
-  authMode: 'disabled' | 'bearer';
+  authMode: AuthMode;
   userId?: string;
   role?: 'admin';
+}
+
+export interface LoginRequestShape {
+  token: string;
 }
 
 export interface ModelDescriptor {
@@ -60,4 +66,3 @@ export interface ChatCompletionRequestShape {
   top_p?: number;
   max_tokens?: number;
 }
-
