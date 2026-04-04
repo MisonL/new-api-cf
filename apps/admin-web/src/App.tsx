@@ -1,7 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   bootstrapAdminState,
+  createAdminToken,
+  deleteAdminToken,
   fetchAdminState,
+  fetchAdminTokens,
   fetchModels,
   fetchSession,
   fetchStatus,
@@ -9,8 +12,11 @@ import {
   logout,
   saveAdminSettings,
   sendChatCompletion,
+  updateAdminToken,
   updateAdminModel,
   type AdminState,
+  type ApiTokenCreateResult,
+  type ApiTokenDescriptor,
   type ChatCompletionResponse,
   type ModelListData,
   type SessionData,
@@ -111,18 +117,32 @@ function SessionPanel(props: {
 function PlaygroundPanel(props: {
   status: StatusData | null;
   adminState: AdminState | null;
+  latestCreatedToken: ApiTokenCreateResult | null;
   models: ModelListData | null;
   modelsError: string | null;
   pending: boolean;
   chatResult: ChatCompletionResponse | null;
   chatError: string | null;
   onReloadModels: () => Promise<void>;
-  onSend: (input: { model: string; prompt: string; systemPrompt: string }) => Promise<void>;
+  onSend: (input: { model: string; prompt: string; systemPrompt: string; bearerToken?: string }) => Promise<void>;
 }) {
-  const { status, adminState, models, modelsError, pending, chatResult, chatError, onReloadModels, onSend } = props;
+  const {
+    status,
+    adminState,
+    latestCreatedToken,
+    models,
+    modelsError,
+    pending,
+    chatResult,
+    chatError,
+    onReloadModels,
+    onSend
+  } = props;
   const [model, setModel] = useState('');
   const [prompt, setPrompt] = useState('用一句话说明你是一个 Cloudflare 上运行的最小 AI 网关。');
   const [systemPrompt, setSystemPrompt] = useState('你是一个简洁的系统说明助手。');
+  const [useApiToken, setUseApiToken] = useState(false);
+  const [relayToken, setRelayToken] = useState('');
 
   useEffect(() => {
     if (!model && models && models.data.length > 0) {
@@ -135,7 +155,8 @@ function PlaygroundPanel(props: {
     await onSend({
       model,
       prompt,
-      systemPrompt
+      systemPrompt,
+      bearerToken: useApiToken ? relayToken : undefined
     });
   }
 
@@ -162,6 +183,9 @@ function PlaygroundPanel(props: {
         </div>
         {modelsError ? <p className="error-text">{modelsError}</p> : null}
         {!playgroundEnabled ? <p className="error-text">当前 D1 设置已关闭 playground。</p> : null}
+        {latestCreatedToken ? (
+          <p className="meta-text">最近创建 token: {latestCreatedToken.descriptor.name} / ****{latestCreatedToken.descriptor.last4}</p>
+        ) : null}
         <form className="stack" onSubmit={(event) => void handleSubmit(event)}>
           <label className="label" htmlFor="model-select">
             模型
@@ -200,6 +224,30 @@ function PlaygroundPanel(props: {
             onChange={(event) => setPrompt(event.target.value)}
             value={prompt}
           />
+          <label className="checkbox-row">
+            <input
+              checked={useApiToken}
+              disabled={pending}
+              onChange={(event) => setUseApiToken(event.target.checked)}
+              type="checkbox"
+            />
+            <span>使用 API token 调用 `/v1/chat/completions`</span>
+          </label>
+          {useApiToken ? (
+            <>
+              <label className="label" htmlFor="relay-token">
+                Relay Token
+              </label>
+              <textarea
+                id="relay-token"
+                className="input textarea textarea-compact"
+                disabled={pending}
+                onChange={(event) => setRelayToken(event.target.value)}
+                placeholder="粘贴新创建的 API token"
+                value={relayToken}
+              />
+            </>
+          ) : null}
           <button className="action" disabled={pending || !playgroundEnabled || !model || prompt.trim().length === 0} type="submit">
             {pending ? '请求中...' : '发送请求'}
           </button>
@@ -210,6 +258,133 @@ function PlaygroundPanel(props: {
         </pre>
       </div>
     </section>
+  );
+}
+
+function TokenPanel(props: {
+  session: SessionData | null;
+  tokens: ApiTokenDescriptor[];
+  latestCreatedToken: ApiTokenCreateResult | null;
+  pending: boolean;
+  tokenError: string | null;
+  onCreate: (name: string) => Promise<void>;
+  onUpdate: (tokenId: string, input: { name: string; enabled: boolean }) => Promise<void>;
+  onDelete: (tokenId: string) => Promise<void>;
+}) {
+  const { session, tokens, latestCreatedToken, pending, tokenError, onCreate, onUpdate, onDelete } = props;
+  const [name, setName] = useState('default relay token');
+
+  if (!session?.authenticated) {
+    return null;
+  }
+
+  return (
+    <section className="panel panel-soft">
+      <div className="panel-header">
+        <h2>API Tokens</h2>
+        <span className="badge">{tokens.length} tokens</span>
+      </div>
+      <div className="stack">
+        <form
+          className="inline-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void onCreate(name);
+          }}
+        >
+          <input
+            className="input"
+            disabled={pending}
+            onChange={(event) => setName(event.target.value)}
+            value={name}
+          />
+          <button className="action" disabled={pending || name.trim().length === 0} type="submit">
+            创建 token
+          </button>
+        </form>
+        {latestCreatedToken ? (
+          <pre className="status-block status-block-soft">
+            {JSON.stringify(latestCreatedToken, null, 2)}
+          </pre>
+        ) : null}
+        {tokenError ? <p className="error-text">{tokenError}</p> : null}
+        {tokens.length === 0 ? (
+          <p className="meta-text">当前没有 API token。</p>
+        ) : (
+          tokens.map((token) => (
+            <TokenRowEditor
+              key={token.id}
+              disabled={pending}
+              onDelete={onDelete}
+              onSave={onUpdate}
+              token={token}
+            />
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TokenRowEditor(props: {
+  token: ApiTokenDescriptor;
+  disabled: boolean;
+  onSave: (tokenId: string, input: { name: string; enabled: boolean }) => Promise<void>;
+  onDelete: (tokenId: string) => Promise<void>;
+}) {
+  const { token, disabled, onSave, onDelete } = props;
+  const [name, setName] = useState(token.name);
+  const [enabled, setEnabled] = useState(token.enabled);
+
+  useEffect(() => {
+    setName(token.name);
+    setEnabled(token.enabled);
+  }, [token.enabled, token.name]);
+
+  return (
+    <form
+      className="model-row"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void onSave(token.id, {
+          name,
+          enabled
+        });
+      }}
+    >
+      <div className="model-row-main">
+        <strong>{token.name}</strong>
+        <span className="meta-text">id {token.id} / ****{token.last4}</span>
+        <input
+          className="input"
+          disabled={disabled}
+          onChange={(event) => setName(event.target.value)}
+          value={name}
+        />
+      </div>
+      <label className="checkbox-row">
+        <input
+          checked={enabled}
+          disabled={disabled}
+          onChange={(event) => setEnabled(event.target.checked)}
+          type="checkbox"
+        />
+        <span>启用</span>
+      </label>
+      <div className="token-actions">
+        <button className="action action-secondary" disabled={disabled} type="submit">
+          保存
+        </button>
+        <button
+          className="action action-danger"
+          disabled={disabled}
+          onClick={() => void onDelete(token.id)}
+          type="button"
+        >
+          删除
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -383,10 +558,13 @@ export function App() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [models, setModels] = useState<ModelListData | null>(null);
   const [adminState, setAdminState] = useState<AdminState | null>(null);
+  const [adminTokens, setAdminTokens] = useState<ApiTokenDescriptor[]>([]);
+  const [latestCreatedToken, setLatestCreatedToken] = useState<ApiTokenCreateResult | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatResult, setChatResult] = useState<ChatCompletionResponse | null>(null);
   const [pending, setPending] = useState(false);
@@ -395,6 +573,7 @@ export function App() {
     const currentSession = nextSession ?? session;
     if (!currentSession?.authenticated) {
       setAdminState(null);
+      setAdminTokens([]);
       return;
     }
 
@@ -413,11 +592,29 @@ export function App() {
     }
   }
 
+  async function refreshAdminTokens(nextSession?: SessionData | null) {
+    const currentSession = nextSession ?? session;
+    if (!currentSession?.authenticated) {
+      setAdminTokens([]);
+      return;
+    }
+
+    setTokenError(null);
+    try {
+      const payload = await fetchAdminTokens();
+      setAdminTokens(payload.data);
+    } catch (cause) {
+      setAdminTokens([]);
+      setTokenError(cause instanceof Error ? cause.message : 'failed to load admin tokens');
+    }
+  }
+
   async function refresh() {
     const [nextStatus, nextSession] = await Promise.all([fetchStatus(), fetchSession()]);
     setStatus(nextStatus);
     setSession(nextSession);
     await refreshAdminState(nextSession);
+    await refreshAdminTokens(nextSession);
   }
 
   async function loadModels() {
@@ -497,6 +694,7 @@ export function App() {
     try {
       await logout();
       setChatResult(null);
+      setLatestCreatedToken(null);
       await refresh();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : 'logout failed');
@@ -505,7 +703,7 @@ export function App() {
     }
   }
 
-  async function handleSend(input: { model: string; prompt: string; systemPrompt: string }) {
+  async function handleSend(input: { model: string; prompt: string; systemPrompt: string; bearerToken?: string }) {
     setPending(true);
     setChatError(null);
     try {
@@ -514,6 +712,46 @@ export function App() {
     } catch (cause) {
       setChatResult(null);
       setChatError(cause instanceof Error ? cause.message : 'chat request failed');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleCreateToken(name: string) {
+    setPending(true);
+    setTokenError(null);
+    try {
+      const result = await createAdminToken(name);
+      setLatestCreatedToken(result);
+      await refreshAdminTokens();
+    } catch (cause) {
+      setTokenError(cause instanceof Error ? cause.message : 'create token failed');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleUpdateToken(tokenId: string, input: { name: string; enabled: boolean }) {
+    setPending(true);
+    setTokenError(null);
+    try {
+      await updateAdminToken(tokenId, input);
+      await refreshAdminTokens();
+    } catch (cause) {
+      setTokenError(cause instanceof Error ? cause.message : 'update token failed');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleDeleteToken(tokenId: string) {
+    setPending(true);
+    setTokenError(null);
+    try {
+      await deleteAdminToken(tokenId);
+      await refreshAdminTokens();
+    } catch (cause) {
+      setTokenError(cause instanceof Error ? cause.message : 'delete token failed');
     } finally {
       setPending(false);
     }
@@ -534,8 +772,10 @@ export function App() {
         if (nextSession.authenticated) {
           try {
             const nextAdminState = await fetchAdminState();
+            const tokenPayload = await fetchAdminTokens();
             if (!cancelled) {
               setAdminState(nextAdminState);
+              setAdminTokens(tokenPayload.data);
               setModels({
                 object: 'list',
                 stateStore: nextAdminState.stateStore,
@@ -628,12 +868,23 @@ export function App() {
           adminState={adminState}
           chatError={chatError}
           chatResult={chatResult}
+          latestCreatedToken={latestCreatedToken}
           models={models}
           modelsError={modelsError}
           onReloadModels={loadModels}
           onSend={handleSend}
           pending={pending}
           status={status}
+        />
+        <TokenPanel
+          latestCreatedToken={latestCreatedToken}
+          onCreate={handleCreateToken}
+          onDelete={handleDeleteToken}
+          onUpdate={handleUpdateToken}
+          pending={pending}
+          session={session}
+          tokenError={tokenError}
+          tokens={adminTokens}
         />
       </div>
 

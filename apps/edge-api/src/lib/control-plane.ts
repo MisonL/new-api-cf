@@ -1,5 +1,7 @@
 import type {
   AdminStateShape,
+  ApiTokenCreateResult,
+  ApiTokenDescriptor,
   ControlSettingValues,
   ModelDescriptor,
   StateStoreKind
@@ -7,6 +9,7 @@ import type {
 import { execute, queryAll, queryFirst } from './d1';
 import { ApiError } from './errors';
 import type { RuntimeConfig } from './config';
+import { generateApiToken, hashApiToken, last4OfToken } from './token-auth';
 
 const DEFAULT_SETTINGS: ControlSettingValues = {
   publicAppName: 'new-api-cf',
@@ -23,6 +26,15 @@ type ModelRow = {
 
 type SettingRow = {
   value_json: string;
+};
+
+type ApiTokenRow = {
+  id: string;
+  name: string;
+  last4: string;
+  enabled: number;
+  created_at: string;
+  updated_at: string;
 };
 
 function now(): string {
@@ -48,6 +60,17 @@ function toModelDescriptor(row: ModelRow): ModelDescriptor {
     ownedBy: row.provider,
     label: row.label,
     enabled: row.enabled === 1
+  };
+}
+
+function toApiTokenDescriptor(row: ApiTokenRow): ApiTokenDescriptor {
+  return {
+    id: row.id,
+    name: row.name,
+    last4: row.last4,
+    enabled: row.enabled === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
@@ -194,4 +217,107 @@ export async function updateModel(
       model: input.id
     });
   }
+}
+
+export async function listApiTokens(env: Env): Promise<ApiTokenDescriptor[]> {
+  const rows = await queryAll<ApiTokenRow>(
+    env,
+    `SELECT id, name, last4, enabled, created_at, updated_at
+     FROM api_tokens
+     ORDER BY created_at DESC`
+  );
+  return rows.map(toApiTokenDescriptor);
+}
+
+export async function createApiToken(env: Env, input: { name: string }): Promise<ApiTokenCreateResult> {
+  const token = generateApiToken();
+  const tokenHash = await hashApiToken(token);
+  const timestamp = now();
+  const id = crypto.randomUUID();
+
+  await execute(
+    env,
+    `INSERT INTO api_tokens (id, name, token_hash, last4, enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 1, ?, ?)`,
+    id,
+    input.name,
+    tokenHash,
+    last4OfToken(token),
+    timestamp,
+    timestamp
+  );
+
+  return {
+    token,
+    descriptor: {
+      id,
+      name: input.name,
+      last4: last4OfToken(token),
+      enabled: true,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }
+  };
+}
+
+export async function updateApiToken(
+  env: Env,
+  input: {
+    id: string;
+    name: string;
+    enabled: boolean;
+  }
+) {
+  const timestamp = now();
+  const result = await execute(
+    env,
+    `UPDATE api_tokens
+     SET name = ?, enabled = ?, updated_at = ?
+     WHERE id = ?`,
+    input.name,
+    input.enabled ? 1 : 0,
+    timestamp,
+    input.id
+  );
+
+  if ((result.meta.changes ?? 0) === 0) {
+    throw new ApiError(404, 'TOKEN_NOT_FOUND', 'api token does not exist', {
+      tokenId: input.id
+    });
+  }
+}
+
+export async function deleteApiToken(env: Env, tokenId: string) {
+  const result = await execute(
+    env,
+    'DELETE FROM api_tokens WHERE id = ?',
+    tokenId
+  );
+
+  if ((result.meta.changes ?? 0) === 0) {
+    throw new ApiError(404, 'TOKEN_NOT_FOUND', 'api token does not exist', {
+      tokenId
+    });
+  }
+}
+
+export async function verifyApiToken(env: Env, token: string): Promise<ApiTokenDescriptor> {
+  if (!env.DB) {
+    throw new ApiError(503, 'D1_NOT_CONFIGURED', 'D1 binding is not configured');
+  }
+
+  const tokenHash = await hashApiToken(token);
+  const row = await queryFirst<ApiTokenRow>(
+    env,
+    `SELECT id, name, last4, enabled, created_at, updated_at
+     FROM api_tokens
+     WHERE token_hash = ?`,
+    tokenHash
+  );
+
+  if (!row || row.enabled !== 1) {
+    throw new ApiError(401, 'INVALID_API_TOKEN', 'api token is invalid or disabled');
+  }
+
+  return toApiTokenDescriptor(row);
 }

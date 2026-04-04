@@ -3,6 +3,7 @@ import { chatCompletionRequestSchema } from '../schemas/chat';
 import { getRuntimeConfig } from '../lib/config';
 import { forwardChatCompletion } from '../lib/upstream';
 import { ApiError } from '../lib/errors';
+import { requireRelayAccess } from '../lib/relay-auth';
 
 export function createChatRouter() {
   const router = new Hono<{ Bindings: Env }>();
@@ -13,6 +14,7 @@ export function createChatRouter() {
     });
     const request = chatCompletionRequestSchema.parse(payload);
     const config = getRuntimeConfig(c.env);
+    await requireRelayAccess(c, config);
     return forwardChatCompletion(c.env, request, config);
   });
 

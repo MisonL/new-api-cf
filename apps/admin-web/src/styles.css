@@ -157,6 +157,10 @@ body {
   font: inherit;
 }
 
+.textarea-compact {
+  min-height: 88px;
+}
+
 .action {
   width: fit-content;
   min-width: 120px;
@@ -174,6 +178,11 @@ body {
   border: 1px solid rgba(20, 32, 24, 0.12);
 }
 
+.action-danger {
+  background: #7f1d1d;
+  color: #fff4f4;
+}
+
 .action:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -189,6 +198,13 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
 }
 
 .meta-text {
@@ -223,6 +239,11 @@ body {
   gap: 10px;
 }
 
+.token-actions {
+  display: grid;
+  gap: 10px;
+}
+
 .section-title {
   margin: 0;
   font-size: 18px;
@@ -234,6 +255,10 @@ body {
   }
 
   .model-row {
+    grid-template-columns: 1fr;
+  }
+
+  .inline-form {
     grid-template-columns: 1fr;
   }
 }

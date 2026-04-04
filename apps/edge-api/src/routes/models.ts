@@ -3,6 +3,7 @@ import { ensureUpstreamReady, resolveModelCatalog } from '../lib/upstream';
 import { getRuntimeConfig } from '../lib/config';
 import { ok } from '../lib/http';
 import type { Context } from 'hono';
+import { requireRelayAccess } from '../lib/relay-auth';
 
 async function createModelPayload(c: Context<{ Bindings: Env }>) {
   const config = getRuntimeConfig(c.env);
@@ -23,6 +24,8 @@ export function createModelRouter() {
   });
 
   router.get('/v1/models', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    await requireRelayAccess(c, config);
     const payload = await createModelPayload(c);
     return c.json(payload);
   });

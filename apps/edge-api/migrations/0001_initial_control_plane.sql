@@ -12,4 +12,3 @@ CREATE TABLE IF NOT EXISTS relay_models (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-

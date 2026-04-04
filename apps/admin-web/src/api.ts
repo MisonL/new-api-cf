@@ -67,6 +67,20 @@ export type AdminState = {
   }>;
 };
 
+export type ApiTokenDescriptor = {
+  id: string;
+  name: string;
+  last4: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiTokenCreateResult = {
+  token: string;
+  descriptor: ApiTokenDescriptor;
+};
+
 export type ChatCompletionResponse = {
   id: string;
   object: 'chat.completion';
@@ -141,6 +155,7 @@ export function sendChatCompletion(input: {
   model: string;
   prompt: string;
   systemPrompt?: string;
+  bearerToken?: string;
 }) {
   const messages = [];
 
@@ -156,8 +171,14 @@ export function sendChatCompletion(input: {
     content: input.prompt.trim()
   });
 
+  const headers = new Headers();
+  if (input.bearerToken && input.bearerToken.trim().length > 0) {
+    headers.set('authorization', `Bearer ${input.bearerToken.trim()}`);
+  }
+
   return request<ChatCompletionResponse>('/v1/chat/completions', {
     method: 'POST',
+    headers,
     body: JSON.stringify({
       model: input.model,
       messages
@@ -189,5 +210,31 @@ export function updateAdminModel(modelId: string, input: { label: string; enable
   return request<{ saved: boolean }>(`/api/admin/models/${encodeURIComponent(modelId)}`, {
     method: 'PATCH',
     body: JSON.stringify(input)
+  });
+}
+
+export function fetchAdminTokens() {
+  return request<{ data: ApiTokenDescriptor[] }>('/api/admin/tokens', {
+    method: 'GET'
+  });
+}
+
+export function createAdminToken(name: string) {
+  return request<ApiTokenCreateResult>('/api/admin/tokens', {
+    method: 'POST',
+    body: JSON.stringify({ name })
+  });
+}
+
+export function updateAdminToken(tokenId: string, input: { name: string; enabled: boolean }) {
+  return request<{ saved: boolean }>(`/api/admin/tokens/${encodeURIComponent(tokenId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input)
+  });
+}
+
+export function deleteAdminToken(tokenId: string) {
+  return request<{ deleted: boolean }>(`/api/admin/tokens/${encodeURIComponent(tokenId)}`, {
+    method: 'DELETE'
   });
 }

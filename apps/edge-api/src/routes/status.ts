@@ -27,7 +27,7 @@ export function createStatusRouter() {
       modelCount: modelState.models.length,
       d1Configured: Boolean(c.env.DB),
       endpoints: {
-        admin: ['/api/auth/session', '/api/auth/login', '/api/auth/logout', '/api/admin/state', '/api/admin/bootstrap', '/api/admin/settings', '/api/me', '/api/models'],
+        admin: ['/api/auth/session', '/api/auth/login', '/api/auth/logout', '/api/admin/state', '/api/admin/bootstrap', '/api/admin/settings', '/api/admin/tokens', '/api/me', '/api/models'],
         openaiCompatible: ['/v1/models', '/v1/chat/completions']
       }
     });

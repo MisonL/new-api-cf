@@ -27,6 +27,10 @@
   - `POST /api/admin/bootstrap`
   - `PUT /api/admin/settings`
   - `PATCH /api/admin/models/:id`
+  - `GET /api/admin/tokens`
+  - `POST /api/admin/tokens`
+  - `PATCH /api/admin/tokens/:id`
+  - `DELETE /api/admin/tokens/:id`
   - `GET /api/me`
   - `GET /api/models`
   - `GET /v1/models`
@@ -36,6 +40,7 @@
   - 登录面板
   - D1 控制面设置
   - 模型目录编辑
+  - API token 管理
   - 最小 chat playground
 - `packages/shared`
   - 共享 DTO、错误模型和最小 relay 契约
@@ -52,7 +57,11 @@
 - D1 负责低频控制数据：
   - `control_settings`
   - `relay_models`
+  - `api_tokens`
 - 当 Worker 已绑定 D1 且目录为空时，`/api/models` 会显式返回 `MODEL_CATALOG_EMPTY`
+- `/v1/models` 与 `/v1/chat/completions` 当前要求：
+  - admin session
+  - 或 D1 API token
 - 当前已接入 D1，KV / Durable Objects / Queues 仍未接入
 
 ## 开发命令
@@ -83,6 +92,7 @@ bun run --cwd apps/edge-api d1:migrate:local
 2. 启动 Worker
 3. 登录管理页
 4. 调用 `/api/admin/bootstrap` 初始化 D1 控制面目录
+5. 通过 `/api/admin/tokens` 创建用户侧 relay token
 
 ## 目录结构
 

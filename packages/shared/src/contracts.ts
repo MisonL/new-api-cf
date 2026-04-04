@@ -96,3 +96,17 @@ export interface AdminStateShape {
   settings: ControlSettingValues;
   models: ModelDescriptor[];
 }
+
+export interface ApiTokenDescriptor {
+  id: string;
+  name: string;
+  last4: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiTokenCreateResult {
+  token: string;
+  descriptor: ApiTokenDescriptor;
+}

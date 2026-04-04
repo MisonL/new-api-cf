@@ -3,19 +3,7 @@ import type { SessionInfo } from '../../../../packages/shared/src/contracts';
 import { ApiError } from './errors';
 import type { RuntimeConfig } from './config';
 import { readSessionFromCookie } from './session';
-
-function readBearerToken(authorizationHeader: string | undefined): string | null {
-  if (!authorizationHeader) {
-    return null;
-  }
-
-  const [scheme, token] = authorizationHeader.split(' ');
-  if (scheme?.toLowerCase() !== 'bearer' || !token) {
-    return null;
-  }
-
-  return token;
-}
+import { readBearerToken } from './token-auth';
 
 function getAnonymousSession(authMode: SessionInfo['authMode']): SessionInfo {
   return {
@@ -76,6 +64,11 @@ export async function requireAdmin(c: Context, config: RuntimeConfig) {
     throw new ApiError(401, 'UNAUTHORIZED', 'missing or invalid admin credentials');
   }
   return session;
+}
+
+export async function getAdminSessionOrNull(c: Context, config: RuntimeConfig) {
+  const session = await getSessionInfo(c, config);
+  return session.authenticated ? session : null;
 }
 
 export function assertLoginEnabled(config: RuntimeConfig) {
