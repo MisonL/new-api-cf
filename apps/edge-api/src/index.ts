@@ -11,6 +11,7 @@ import { requestIdMiddleware } from './lib/request-id';
 import { ApiError } from './lib/errors';
 import { fail } from './lib/http';
 import type { AppEnv } from './lib/types';
+import { consumeUsageQueue } from './lib/usage-queue';
 
 const app = new Hono<AppEnv>();
 
@@ -47,4 +48,9 @@ app.onError((cause, c) => {
   return fail(c, new ApiError(500, 'INTERNAL_ERROR', 'unexpected internal error'));
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  queue: async (batch: MessageBatch<unknown>, env: Env) => {
+    await consumeUsageQueue(batch, env);
+  }
+};

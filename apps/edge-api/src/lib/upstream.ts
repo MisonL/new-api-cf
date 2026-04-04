@@ -7,7 +7,7 @@ import { getUpstreamProfileById, profileSupportsModel, type RuntimeConfig } from
 import { ApiError } from './errors';
 import { getEnabledModels } from './control-plane';
 import type { RelayAccessContext } from './relay-auth';
-import { recordUsage } from './usage';
+import { dispatchUsageEvent } from './usage-queue';
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
@@ -105,7 +105,7 @@ export async function forwardChatCompletion(
     });
   } catch (cause) {
     if (abortController.signal.aborted) {
-      await recordUsage(env, {
+      await dispatchUsageEvent(env, {
         actor: access.usageActor,
         upstreamProfileId: profile.id,
         model: request.model,
@@ -117,7 +117,7 @@ export async function forwardChatCompletion(
       });
     }
 
-    await recordUsage(env, {
+    await dispatchUsageEvent(env, {
       actor: access.usageActor,
       upstreamProfileId: profile.id,
       model: request.model,
@@ -131,7 +131,7 @@ export async function forwardChatCompletion(
     clearTimeout(timeoutHandle);
   }
 
-  await recordUsage(env, {
+  await dispatchUsageEvent(env, {
     actor: access.usageActor,
     upstreamProfileId: profile.id,
     model: request.model,

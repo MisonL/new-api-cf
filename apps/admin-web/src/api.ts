@@ -25,6 +25,7 @@ export type StatusData = {
   modelCount: number;
   d1Configured: boolean;
   kvConfigured?: boolean;
+  queueConfigured?: boolean;
   endpoints: {
     admin: string[];
     openaiCompatible: string[];

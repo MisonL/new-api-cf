@@ -66,6 +66,10 @@
   - 只在 bootstrap / 模型更新时刷新
   - 读取命中时优先走 KV，降低 `/api/models` 和 relay 前置校验的 D1 读取
   - 不承载配额、计数器或其他强一致状态
+- 若绑定 `USAGE_EVENTS` Queue，relay usage 会优先异步入队：
+  - Queue consumer 在同一个 Worker 内批量聚合写回 D1
+  - 未绑定 Queue 时，继续走当前同步 D1 兜底
+  - 这样可以把 usage 聚合逐步从主链移出，而不改变当前接口行为
 - `/api/admin/usage` 提供近 1 到 30 天的 D1 usage 日聚合视图：
   - 按 `usage_date + actor + upstream profile + model` 聚合
   - 当前只记录请求数、成功数、失败数和最近状态码
@@ -99,6 +103,7 @@ bun run --cwd apps/edge-api d1:migrate:local
 - `UPSTREAM_PROFILES_JSON=[{"id":"primary","label":"Primary","baseUrl":"https://.../v1","apiKey":"...","providerName":"provider-a","modelAllowlist":["gpt-4o-mini"]}]`
 - `UPSTREAM_DEFAULT_PROFILE_ID=primary`
 - `MODEL_CATALOG_CACHE=<optional KV binding>`
+- `USAGE_EVENTS=<optional Queue binding>`
 - `VITE_EDGE_API_BASE_URL=https://edge.example.com`
 
 说明：

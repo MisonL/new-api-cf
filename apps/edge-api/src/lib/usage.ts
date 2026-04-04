@@ -13,6 +13,16 @@ import { execute, queryAll } from './d1';
 
 type UsageOutcome = 'success' | 'error';
 
+export type UsageWriteInput = {
+  usageDate: string;
+  occurredAt: string;
+  actor: UsageActor;
+  upstreamProfileId: string;
+  model: string;
+  outcome: UsageOutcome;
+  statusCode: number;
+};
+
 type UsageDailyRow = {
   usage_date: string;
   actor_kind: UsageActorKind;
@@ -74,6 +84,106 @@ function toUsageAggregateRow(config: RuntimeConfig, row: UsageDailyRow): UsageAg
   };
 }
 
+function mergeUsageWrites(inputs: UsageWriteInput[]) {
+  const merged = new Map<string, {
+    usageDate: string;
+    actorKind: UsageActorKind;
+    actorId: string;
+    upstreamProfileId: string;
+    model: string;
+    requestCount: number;
+    successCount: number;
+    errorCount: number;
+    lastStatus: number;
+    updatedAt: string;
+    occurredAt: string;
+  }>();
+
+  for (const input of inputs) {
+    const key = [
+      input.usageDate,
+      input.actor.kind,
+      input.actor.actorId,
+      input.upstreamProfileId,
+      input.model
+    ].join(':');
+
+    const current = merged.get(key);
+    const successDelta = input.outcome === 'success' ? 1 : 0;
+    const errorDelta = input.outcome === 'error' ? 1 : 0;
+
+    if (!current) {
+      merged.set(key, {
+        usageDate: input.usageDate,
+        actorKind: input.actor.kind,
+        actorId: input.actor.actorId,
+        upstreamProfileId: input.upstreamProfileId,
+        model: input.model,
+        requestCount: 1,
+        successCount: successDelta,
+        errorCount: errorDelta,
+        lastStatus: input.statusCode,
+        updatedAt: input.occurredAt,
+        occurredAt: input.occurredAt
+      });
+      continue;
+    }
+
+    current.requestCount += 1;
+    current.successCount += successDelta;
+    current.errorCount += errorDelta;
+    if (input.occurredAt >= current.occurredAt) {
+      current.lastStatus = input.statusCode;
+      current.updatedAt = input.occurredAt;
+      current.occurredAt = input.occurredAt;
+    }
+  }
+
+  return [...merged.values()];
+}
+
+export async function recordUsageBatch(env: Env, inputs: UsageWriteInput[]) {
+  if (!env.DB) {
+    return;
+  }
+
+  const mergedWrites = mergeUsageWrites(inputs);
+  for (const item of mergedWrites) {
+    await execute(
+      env,
+      `INSERT INTO usage_daily (
+         usage_date,
+         actor_kind,
+         actor_id,
+         upstream_profile_id,
+         model,
+         request_count,
+         success_count,
+         error_count,
+         last_status,
+         updated_at
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(usage_date, actor_kind, actor_id, upstream_profile_id, model) DO UPDATE SET
+         request_count = usage_daily.request_count + excluded.request_count,
+         success_count = usage_daily.success_count + excluded.success_count,
+         error_count = usage_daily.error_count + excluded.error_count,
+         last_status = excluded.last_status,
+         updated_at = excluded.updated_at`,
+      item.usageDate,
+      item.actorKind,
+      item.actorId,
+      item.upstreamProfileId,
+      item.model,
+      item.requestCount,
+      item.successCount,
+      item.errorCount,
+      item.lastStatus,
+      item.updatedAt
+    );
+  }
+}
+
 export async function recordUsage(env: Env, input: {
   actor: UsageActor;
   upstreamProfileId: string;
@@ -81,45 +191,18 @@ export async function recordUsage(env: Env, input: {
   outcome: UsageOutcome;
   statusCode: number;
 }) {
-  if (!env.DB) {
-    return;
-  }
-
-  const timestamp = now();
-  const successDelta = input.outcome === 'success' ? 1 : 0;
-  const errorDelta = input.outcome === 'error' ? 1 : 0;
-
-  await execute(
-    env,
-    `INSERT INTO usage_daily (
-       usage_date,
-       actor_kind,
-       actor_id,
-       upstream_profile_id,
-       model,
-       request_count,
-       success_count,
-       error_count,
-       last_status,
-       updated_at
-     )
-     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
-     ON CONFLICT(usage_date, actor_kind, actor_id, upstream_profile_id, model) DO UPDATE SET
-       request_count = usage_daily.request_count + 1,
-       success_count = usage_daily.success_count + excluded.success_count,
-       error_count = usage_daily.error_count + excluded.error_count,
-       last_status = excluded.last_status,
-       updated_at = excluded.updated_at`,
-    todayUtc(),
-    input.actor.kind,
-    input.actor.actorId,
-    input.upstreamProfileId,
-    input.model,
-    successDelta,
-    errorDelta,
-    input.statusCode,
-    timestamp
-  );
+  const occurredAt = now();
+  await recordUsageBatch(env, [
+    {
+      usageDate: todayUtc(),
+      occurredAt,
+      actor: input.actor,
+      upstreamProfileId: input.upstreamProfileId,
+      model: input.model,
+      outcome: input.outcome,
+      statusCode: input.statusCode
+    }
+  ]);
 }
 
 export async function getUsageOverview(
