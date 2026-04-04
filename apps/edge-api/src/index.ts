@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { ZodError } from 'zod';
 import { createAuthRouter } from './routes/auth';
+import { createAdminRouter } from './routes/admin';
 import { createChatRouter } from './routes/chat';
 import { createModelRouter } from './routes/models';
 import { createRootRouter } from './routes/root';
@@ -19,6 +20,7 @@ app.use('*', requestIdMiddleware);
 app.route('/', createRootRouter());
 app.route('/', createStatusRouter());
 app.route('/', createAuthRouter());
+app.route('/', createAdminRouter());
 app.route('/', createModelRouter());
 app.route('/', createChatRouter());
 

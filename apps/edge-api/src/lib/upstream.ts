@@ -1,6 +1,11 @@
-import type { ChatCompletionRequestShape, ModelDescriptor } from '../../../../packages/shared/src/contracts';
+import type {
+  ChatCompletionRequestShape,
+  ModelDescriptor,
+  StateStoreKind
+} from '../../../../packages/shared/src/contracts';
 import type { RuntimeConfig } from './config';
 import { ApiError } from './errors';
+import { getEnabledModels } from './control-plane';
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
@@ -18,7 +23,8 @@ export function buildModelList(config: RuntimeConfig): ModelDescriptor[] {
     id: modelId,
     provider: 'openai-compatible',
     object: 'model',
-    ownedBy: config.upstreamProviderName
+    ownedBy: config.upstreamProviderName,
+    label: modelId
   }));
 }
 
@@ -32,20 +38,30 @@ export function ensureUpstreamReady(config: RuntimeConfig) {
   }
 }
 
-export function assertModelAllowed(model: string, config: RuntimeConfig) {
-  if (!config.modelAllowlist.includes(model)) {
+function assertModelAllowed(model: string, modelCatalog: ModelDescriptor[], stateStore: StateStoreKind) {
+  if (!modelCatalog.some((item) => item.id === model)) {
     throw new ApiError(400, 'MODEL_NOT_ALLOWED', 'requested model is not allowed', {
-      model
+      model,
+      stateStore
     });
   }
 }
 
+export async function resolveModelCatalog(env: Env, config: RuntimeConfig): Promise<{
+  stateStore: 'env' | 'd1';
+  models: ModelDescriptor[];
+}> {
+  return getEnabledModels(env, config);
+}
+
 export async function forwardChatCompletion(
+  env: Env,
   request: ChatCompletionRequestShape,
   config: RuntimeConfig
 ): Promise<Response> {
   ensureUpstreamReady(config);
-  assertModelAllowed(request.model, config);
+  const catalog = await resolveModelCatalog(env, config);
+  assertModelAllowed(request.model, catalog.models, catalog.stateStore);
 
   const baseUrl = normalizeBaseUrl(config.upstreamBaseUrl!);
   const abortController = new AbortController();

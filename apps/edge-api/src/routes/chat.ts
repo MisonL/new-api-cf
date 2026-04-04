@@ -13,9 +13,8 @@ export function createChatRouter() {
     });
     const request = chatCompletionRequestSchema.parse(payload);
     const config = getRuntimeConfig(c.env);
-    return forwardChatCompletion(request, config);
+    return forwardChatCompletion(c.env, request, config);
   });
 
   return router;
 }
-

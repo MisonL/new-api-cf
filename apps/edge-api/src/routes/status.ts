@@ -1,12 +1,17 @@
 import { Hono } from 'hono';
 import { getRuntimeConfig, isUpstreamConfigured } from '../lib/config';
 import { ok } from '../lib/http';
+import { getEnabledModels } from '../lib/control-plane';
 
 export function createStatusRouter() {
   const router = new Hono<{ Bindings: Env }>();
 
-  router.get('/api/status', (c) => {
+  router.get('/api/status', async (c) => {
     const config = getRuntimeConfig(c.env);
+    const modelState = await getEnabledModels(c.env, config).catch(() => ({
+      stateStore: c.env.DB ? 'd1' as const : 'env' as const,
+      models: []
+    }));
 
     return ok(c, {
       runtime: 'cloudflare-workers',
@@ -18,8 +23,11 @@ export function createStatusRouter() {
       loginAvailable: config.authMode === 'session',
       corsEnabled: config.corsOrigins.length > 0,
       upstreamTimeoutMs: config.upstreamTimeoutMs,
+      stateStore: modelState.stateStore,
+      modelCount: modelState.models.length,
+      d1Configured: Boolean(c.env.DB),
       endpoints: {
-        admin: ['/api/auth/session', '/api/auth/login', '/api/auth/logout', '/api/me', '/api/models'],
+        admin: ['/api/auth/session', '/api/auth/login', '/api/auth/logout', '/api/admin/state', '/api/admin/bootstrap', '/api/admin/settings', '/api/me', '/api/models'],
         openaiCompatible: ['/v1/models', '/v1/chat/completions']
       }
     });

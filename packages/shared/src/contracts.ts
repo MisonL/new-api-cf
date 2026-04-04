@@ -49,6 +49,8 @@ export interface ModelDescriptor {
   provider: 'openai-compatible';
   object: 'model';
   ownedBy: string;
+  label?: string;
+  enabled?: boolean;
 }
 
 export type ChatMessageRole = 'system' | 'user' | 'assistant' | 'tool';
@@ -79,4 +81,18 @@ export interface ChatCompletionResponseShape {
   created: number;
   model: string;
   choices: ChatCompletionChoice[];
+}
+
+export type StateStoreKind = 'env' | 'd1';
+
+export interface ControlSettingValues {
+  publicAppName: string;
+  welcomeMessage: string;
+  playgroundEnabled: boolean;
+}
+
+export interface AdminStateShape {
+  stateStore: StateStoreKind;
+  settings: ControlSettingValues;
+  models: ModelDescriptor[];
 }

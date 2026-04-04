@@ -23,6 +23,10 @@
   - `GET /api/auth/session`
   - `POST /api/auth/login`
   - `POST /api/auth/logout`
+  - `GET /api/admin/state`
+  - `POST /api/admin/bootstrap`
+  - `PUT /api/admin/settings`
+  - `PATCH /api/admin/models/:id`
   - `GET /api/me`
   - `GET /api/models`
   - `GET /v1/models`
@@ -30,7 +34,8 @@
 - `apps/admin-web`
   - React + Vite 前端骨架
   - 登录面板
-  - 模型列表读取
+  - D1 控制面设置
+  - 模型目录编辑
   - 最小 chat playground
 - `packages/shared`
   - 共享 DTO、错误模型和最小 relay 契约
@@ -44,7 +49,11 @@
 - Worker 会为每个请求生成 `x-request-id`
 - relay 会透传上游 `x-request-id` 到 `x-upstream-request-id`
 - relay 支持 `UPSTREAM_TIMEOUT_MS`，默认 `30000`
-- 当前未引入 D1 / KV / Durable Objects / Queues 绑定，仍处于 Phase 1 骨架态
+- D1 负责低频控制数据：
+  - `control_settings`
+  - `relay_models`
+- 当 Worker 已绑定 D1 且目录为空时，`/api/models` 会显式返回 `MODEL_CATALOG_EMPTY`
+- 当前已接入 D1，KV / Durable Objects / Queues 仍未接入
 
 ## 开发命令
 
@@ -52,6 +61,7 @@
 bun install
 bun run types:edge
 bun run check
+bun run --cwd apps/edge-api d1:migrate:local
 ```
 
 环境变量：
@@ -66,6 +76,13 @@ bun run check
 - `OPENAI_MODEL_ALLOWLIST=gpt-4o-mini,gpt-4.1-mini`
 - `OPENAI_PROVIDER_NAME=<provider-name>`
 - `VITE_EDGE_API_BASE_URL=https://edge.example.com`
+
+本地 D1 初始化流程：
+
+1. `bun run --cwd apps/edge-api d1:migrate:local`
+2. 启动 Worker
+3. 登录管理页
+4. 调用 `/api/admin/bootstrap` 初始化 D1 控制面目录
 
 ## 目录结构
 

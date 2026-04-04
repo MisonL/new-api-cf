@@ -11,6 +11,16 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "new-api-cf-control",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "preview_database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "./migrations",
+      "remote": false
+    }
+  ],
   "vars": {
     "ENVIRONMENT": "development",
     "APP_NAME": "new-api-cf",

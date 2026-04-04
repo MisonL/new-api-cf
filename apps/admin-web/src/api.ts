@@ -21,6 +21,9 @@ export type StatusData = {
   loginAvailable: boolean;
   corsEnabled: boolean;
   upstreamTimeoutMs: number;
+  stateStore: 'env' | 'd1';
+  modelCount: number;
+  d1Configured: boolean;
   endpoints: {
     admin: string[];
     openaiCompatible: string[];
@@ -36,11 +39,31 @@ export type SessionData = {
 
 export type ModelListData = {
   object: 'list';
+  stateStore: 'env' | 'd1';
   data: Array<{
     id: string;
     provider: 'openai-compatible';
     object: 'model';
     ownedBy: string;
+    label?: string;
+    enabled?: boolean;
+  }>;
+};
+
+export type AdminState = {
+  stateStore: 'env' | 'd1';
+  settings: {
+    publicAppName: string;
+    welcomeMessage: string;
+    playgroundEnabled: boolean;
+  };
+  models: Array<{
+    id: string;
+    provider: 'openai-compatible';
+    object: 'model';
+    ownedBy: string;
+    label?: string;
+    enabled?: boolean;
   }>;
 };
 
@@ -139,5 +162,32 @@ export function sendChatCompletion(input: {
       model: input.model,
       messages
     })
+  });
+}
+
+export function fetchAdminState() {
+  return request<AdminState>('/api/admin/state', {
+    method: 'GET'
+  });
+}
+
+export function bootstrapAdminState() {
+  return request<AdminState>('/api/admin/bootstrap', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+export function saveAdminSettings(settings: AdminState['settings']) {
+  return request<{ saved: boolean }>('/api/admin/settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings)
+  });
+}
+
+export function updateAdminModel(modelId: string, input: { label: string; enabled: boolean }) {
+  return request<{ saved: boolean }>(`/api/admin/models/${encodeURIComponent(modelId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input)
   });
 }

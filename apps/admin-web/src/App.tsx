@@ -1,11 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
+  bootstrapAdminState,
+  fetchAdminState,
   fetchModels,
   fetchSession,
   fetchStatus,
   login,
   logout,
+  saveAdminSettings,
   sendChatCompletion,
+  updateAdminModel,
+  type AdminState,
   type ChatCompletionResponse,
   type ModelListData,
   type SessionData,
@@ -105,6 +110,7 @@ function SessionPanel(props: {
 
 function PlaygroundPanel(props: {
   status: StatusData | null;
+  adminState: AdminState | null;
   models: ModelListData | null;
   modelsError: string | null;
   pending: boolean;
@@ -113,7 +119,7 @@ function PlaygroundPanel(props: {
   onReloadModels: () => Promise<void>;
   onSend: (input: { model: string; prompt: string; systemPrompt: string }) => Promise<void>;
 }) {
-  const { status, models, modelsError, pending, chatResult, chatError, onReloadModels, onSend } = props;
+  const { status, adminState, models, modelsError, pending, chatResult, chatError, onReloadModels, onSend } = props;
   const [model, setModel] = useState('');
   const [prompt, setPrompt] = useState('用一句话说明你是一个 Cloudflare 上运行的最小 AI 网关。');
   const [systemPrompt, setSystemPrompt] = useState('你是一个简洁的系统说明助手。');
@@ -137,6 +143,8 @@ function PlaygroundPanel(props: {
     return null;
   }
 
+  const playgroundEnabled = adminState?.settings.playgroundEnabled ?? true;
+
   return (
     <section className="panel panel-soft">
       <div className="panel-header">
@@ -153,6 +161,7 @@ function PlaygroundPanel(props: {
           <span className="meta-text">timeout {status.upstreamTimeoutMs} ms</span>
         </div>
         {modelsError ? <p className="error-text">{modelsError}</p> : null}
+        {!playgroundEnabled ? <p className="error-text">当前 D1 设置已关闭 playground。</p> : null}
         <form className="stack" onSubmit={(event) => void handleSubmit(event)}>
           <label className="label" htmlFor="model-select">
             模型
@@ -191,7 +200,7 @@ function PlaygroundPanel(props: {
             onChange={(event) => setPrompt(event.target.value)}
             value={prompt}
           />
-          <button className="action" disabled={pending || !model || prompt.trim().length === 0} type="submit">
+          <button className="action" disabled={pending || !playgroundEnabled || !model || prompt.trim().length === 0} type="submit">
             {pending ? '请求中...' : '发送请求'}
           </button>
         </form>
@@ -204,21 +213,211 @@ function PlaygroundPanel(props: {
   );
 }
 
+function ControlPlanePanel(props: {
+  status: StatusData | null;
+  session: SessionData | null;
+  adminState: AdminState | null;
+  adminError: string | null;
+  pending: boolean;
+  onBootstrap: () => Promise<void>;
+  onSaveSettings: (settings: AdminState['settings']) => Promise<void>;
+  onUpdateModel: (modelId: string, input: { label: string; enabled: boolean }) => Promise<void>;
+}) {
+  const { status, session, adminState, adminError, pending, onBootstrap, onSaveSettings, onUpdateModel } = props;
+  const [publicAppName, setPublicAppName] = useState('');
+  const [welcomeMessage, setWelcomeMessage] = useState('');
+  const [playgroundEnabled, setPlaygroundEnabled] = useState(true);
+
+  useEffect(() => {
+    if (adminState) {
+      setPublicAppName(adminState.settings.publicAppName);
+      setWelcomeMessage(adminState.settings.welcomeMessage);
+      setPlaygroundEnabled(adminState.settings.playgroundEnabled);
+    }
+  }, [adminState]);
+
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSaveSettings({
+      publicAppName,
+      welcomeMessage,
+      playgroundEnabled
+    });
+  }
+
+  if (!status) {
+    return null;
+  }
+
+  return (
+    <section className="panel panel-soft">
+      <div className="panel-header">
+        <h2>D1 Control Plane</h2>
+        <span className={`badge ${status.d1Configured ? '' : 'badge-error'}`}>
+          {status.d1Configured ? `${status.stateStore} mode` : 'd1 missing'}
+        </span>
+      </div>
+      <div className="stack">
+        <p className="meta-text">D1 负责低频控制数据：系统设置与模型目录。secrets 仍保留在 Worker 环境变量。</p>
+        {!status.d1Configured ? <p className="error-text">当前 Worker 未绑定 D1，本地或远端需先配置数据库。</p> : null}
+        {session?.authenticated && status.d1Configured && adminState?.models.length === 0 ? (
+          <button className="action" disabled={pending} onClick={() => void onBootstrap()} type="button">
+            从环境变量 bootstrap 模型目录
+          </button>
+        ) : null}
+        {adminError ? <p className="error-text">{adminError}</p> : null}
+        {session?.authenticated && adminState ? (
+          <>
+            <form className="stack" onSubmit={(event) => void handleSave(event)}>
+              <label className="label" htmlFor="public-app-name">
+                Public App Name
+              </label>
+              <input
+                id="public-app-name"
+                className="input"
+                disabled={pending}
+                onChange={(event) => setPublicAppName(event.target.value)}
+                value={publicAppName}
+              />
+              <label className="label" htmlFor="welcome-message">
+                Welcome Message
+              </label>
+              <textarea
+                id="welcome-message"
+                className="input textarea"
+                disabled={pending}
+                onChange={(event) => setWelcomeMessage(event.target.value)}
+                value={welcomeMessage}
+              />
+              <label className="checkbox-row">
+                <input
+                  checked={playgroundEnabled}
+                  disabled={pending}
+                  onChange={(event) => setPlaygroundEnabled(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>启用 playground</span>
+              </label>
+              <button className="action" disabled={pending} type="submit">
+                保存设置
+              </button>
+            </form>
+
+            <div className="stack">
+              <h3 className="section-title">模型目录</h3>
+              {adminState.models.length === 0 ? (
+                <p className="meta-text">当前 D1 模型目录为空。</p>
+              ) : (
+                adminState.models.map((model) => (
+                  <ModelRowEditor
+                    key={model.id}
+                    disabled={pending}
+                    model={model}
+                    onSave={onUpdateModel}
+                  />
+                ))
+              )}
+            </div>
+          </>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function ModelRowEditor(props: {
+  model: AdminState['models'][number];
+  disabled: boolean;
+  onSave: (modelId: string, input: { label: string; enabled: boolean }) => Promise<void>;
+}) {
+  const { model, disabled, onSave } = props;
+  const [label, setLabel] = useState(model.label ?? model.id);
+  const [enabled, setEnabled] = useState(model.enabled ?? true);
+
+  useEffect(() => {
+    setLabel(model.label ?? model.id);
+  }, [model.id, model.label]);
+
+  useEffect(() => {
+    setEnabled(model.enabled ?? true);
+  }, [model.enabled, model.id]);
+
+  return (
+    <form
+      className="model-row"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void onSave(model.id, {
+          label,
+          enabled
+        });
+      }}
+    >
+      <div className="model-row-main">
+        <strong>{model.id}</strong>
+        <input
+          className="input"
+          disabled={disabled}
+          onChange={(event) => setLabel(event.target.value)}
+          value={label}
+        />
+      </div>
+      <label className="checkbox-row">
+        <input
+          checked={enabled}
+          disabled={disabled}
+          onChange={(event) => setEnabled(event.target.checked)}
+          type="checkbox"
+        />
+        <span>启用</span>
+      </label>
+      <button className="action action-secondary" disabled={disabled} type="submit">
+        保存模型
+      </button>
+    </form>
+  );
+}
+
 export function App() {
   const [status, setStatus] = useState<StatusData | null>(null);
   const [session, setSession] = useState<SessionData | null>(null);
   const [models, setModels] = useState<ModelListData | null>(null);
+  const [adminState, setAdminState] = useState<AdminState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [modelsError, setModelsError] = useState<string | null>(null);
+  const [adminError, setAdminError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatResult, setChatResult] = useState<ChatCompletionResponse | null>(null);
   const [pending, setPending] = useState(false);
+
+  async function refreshAdminState(nextSession?: SessionData | null) {
+    const currentSession = nextSession ?? session;
+    if (!currentSession?.authenticated) {
+      setAdminState(null);
+      return;
+    }
+
+    setAdminError(null);
+    try {
+      const nextAdminState = await fetchAdminState();
+      setAdminState(nextAdminState);
+      setModels({
+        object: 'list',
+        stateStore: nextAdminState.stateStore,
+        data: nextAdminState.models
+      });
+    } catch (cause) {
+      setAdminState(null);
+      setAdminError(cause instanceof Error ? cause.message : 'failed to load admin state');
+    }
+  }
 
   async function refresh() {
     const [nextStatus, nextSession] = await Promise.all([fetchStatus(), fetchSession()]);
     setStatus(nextStatus);
     setSession(nextSession);
+    await refreshAdminState(nextSession);
   }
 
   async function loadModels() {
@@ -229,6 +428,52 @@ export function App() {
     } catch (cause) {
       setModels(null);
       setModelsError(cause instanceof Error ? cause.message : 'failed to load models');
+    }
+  }
+
+  async function handleBootstrapControlPlane() {
+    setPending(true);
+    setAdminError(null);
+    try {
+      const nextState = await bootstrapAdminState();
+      setAdminState(nextState);
+      setModels({
+        object: 'list',
+        stateStore: nextState.stateStore,
+        data: nextState.models
+      });
+      await refresh();
+    } catch (cause) {
+      setAdminError(cause instanceof Error ? cause.message : 'bootstrap failed');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleSaveSettings(input: AdminState['settings']) {
+    setPending(true);
+    setAdminError(null);
+    try {
+      await saveAdminSettings(input);
+      await refreshAdminState();
+    } catch (cause) {
+      setAdminError(cause instanceof Error ? cause.message : 'save settings failed');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleUpdateModel(modelId: string, input: { label: string; enabled: boolean }) {
+    setPending(true);
+    setAdminError(null);
+    try {
+      await updateAdminModel(modelId, input);
+      await refreshAdminState();
+      await loadModels();
+    } catch (cause) {
+      setAdminError(cause instanceof Error ? cause.message : 'update model failed');
+    } finally {
+      setPending(false);
     }
   }
 
@@ -286,15 +531,32 @@ export function App() {
 
         setStatus(nextStatus);
         setSession(nextSession);
-
-        try {
-          const nextModels = await fetchModels();
-          if (!cancelled) {
-            setModels(nextModels);
+        if (nextSession.authenticated) {
+          try {
+            const nextAdminState = await fetchAdminState();
+            if (!cancelled) {
+              setAdminState(nextAdminState);
+              setModels({
+                object: 'list',
+                stateStore: nextAdminState.stateStore,
+                data: nextAdminState.models
+              });
+            }
+          } catch (cause) {
+            if (!cancelled) {
+              setAdminError(cause instanceof Error ? cause.message : 'failed to load admin state');
+            }
           }
-        } catch (cause) {
-          if (!cancelled) {
-            setModelsError(cause instanceof Error ? cause.message : 'failed to load models');
+        } else {
+          try {
+            const nextModels = await fetchModels();
+            if (!cancelled) {
+              setModels(nextModels);
+            }
+          } catch (cause) {
+            if (!cancelled) {
+              setModelsError(cause instanceof Error ? cause.message : 'failed to load models');
+            }
           }
         }
       } catch (cause) {
@@ -349,7 +611,21 @@ export function App() {
           session={session}
           status={status}
         />
+        <ControlPlanePanel
+          adminError={adminError}
+          adminState={adminState}
+          onBootstrap={handleBootstrapControlPlane}
+          onSaveSettings={handleSaveSettings}
+          onUpdateModel={handleUpdateModel}
+          pending={pending}
+          session={session}
+          status={status}
+        />
+      </div>
+
+      <div className="grid grid-two">
         <PlaygroundPanel
+          adminState={adminState}
           chatError={chatError}
           chatResult={chatResult}
           models={models}
