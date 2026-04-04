@@ -4,8 +4,11 @@ import type { AuthMode, UpstreamProfileDescriptor } from '../../../../packages/s
 const envSchema = z.object({
   ENVIRONMENT: z.string().optional(),
   APP_NAME: z.string().optional(),
-  AUTH_MODE: z.enum(['disabled', 'bearer', 'session']).optional(),
+  AUTH_MODE: z.enum(['disabled', 'bearer', 'session', 'jwt']).optional(),
   ADMIN_BEARER_TOKEN: z.string().optional(),
+  ADMIN_JWT_SECRET: z.string().min(32).optional(),
+  ADMIN_JWT_ISSUER: z.string().min(1).optional(),
+  ADMIN_JWT_AUDIENCE: z.string().min(1).optional(),
   SESSION_SECRET: z.string().min(32).optional(),
   CORS_ORIGIN: z.string().optional(),
   UPSTREAM_TIMEOUT_MS: z.coerce.number().int().positive().max(120000).optional(),
@@ -43,6 +46,9 @@ export type RuntimeConfig = {
   environment: string;
   authMode: AuthMode;
   adminBearerToken?: string;
+  adminJwtSecret?: string;
+  adminJwtIssuer?: string;
+  adminJwtAudience?: string;
   sessionSecret?: string;
   corsOrigins: string[];
   upstreamTimeoutMs: number;
@@ -176,6 +182,9 @@ export function getRuntimeConfig(env: unknown): RuntimeConfig {
     environment: parsed.ENVIRONMENT || 'unknown',
     authMode: parsed.AUTH_MODE || 'disabled',
     adminBearerToken: parsed.ADMIN_BEARER_TOKEN,
+    adminJwtSecret: parsed.ADMIN_JWT_SECRET,
+    adminJwtIssuer: parsed.ADMIN_JWT_ISSUER,
+    adminJwtAudience: parsed.ADMIN_JWT_AUDIENCE,
     sessionSecret: parsed.SESSION_SECRET,
     corsOrigins: parseCsvList(parsed.CORS_ORIGIN),
     upstreamTimeoutMs: parsed.UPSTREAM_TIMEOUT_MS ?? 30000,

@@ -16,7 +16,7 @@ export type StatusData = {
   appName: string;
   environment: string;
   mode: string;
-  authMode: 'disabled' | 'bearer' | 'session';
+  authMode: 'disabled' | 'bearer' | 'session' | 'jwt';
   upstreamConfigured: boolean;
   loginAvailable: boolean;
   corsEnabled: boolean;
@@ -36,7 +36,7 @@ export type StatusData = {
 
 export type SessionData = {
   authenticated: boolean;
-  authMode: 'disabled' | 'bearer' | 'session';
+  authMode: 'disabled' | 'bearer' | 'session' | 'jwt';
   userId?: string;
   role?: 'admin';
 };
@@ -143,11 +143,53 @@ export type ChatCompletionResponse = {
 };
 
 const EDGE_API_BASE_URL = import.meta.env.VITE_EDGE_API_BASE_URL ?? '';
+const ADMIN_JWT_STORAGE_KEY = 'new-api-cf.admin-jwt';
+
+function readStoredAdminJwt(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const token = window.localStorage.getItem(ADMIN_JWT_STORAGE_KEY)?.trim();
+  return token ? token : null;
+}
+
+export function storeAdminJwt(token: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const normalized = token.trim();
+  if (!normalized) {
+    window.localStorage.removeItem(ADMIN_JWT_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(ADMIN_JWT_STORAGE_KEY, normalized);
+}
+
+export function clearStoredAdminJwt() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(ADMIN_JWT_STORAGE_KEY);
+}
+
+export function getStoredAdminJwt() {
+  return readStoredAdminJwt();
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (init?.body) {
     headers.set('content-type', 'application/json');
+  }
+  if (!headers.has('authorization')) {
+    const adminJwt = readStoredAdminJwt();
+    if (adminJwt) {
+      headers.set('authorization', `Bearer ${adminJwt}`);
+    }
   }
 
   const response = await fetch(`${EDGE_API_BASE_URL}${path}`, {

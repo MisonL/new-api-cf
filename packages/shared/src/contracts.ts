@@ -31,7 +31,7 @@ export interface ApiSuccessPayload<T> {
   data: T;
 }
 
-export type AuthMode = 'disabled' | 'bearer' | 'session';
+export type AuthMode = 'disabled' | 'bearer' | 'session' | 'jwt';
 
 export interface SessionInfo {
   authenticated: boolean;

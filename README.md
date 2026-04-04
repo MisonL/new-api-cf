@@ -95,8 +95,11 @@ bun run --cwd apps/edge-api d1:migrate:local
 
 环境变量：
 
-- `AUTH_MODE=disabled|bearer|session`
+- `AUTH_MODE=disabled|bearer|session|jwt`
 - `ADMIN_BEARER_TOKEN=<token>`
+- `ADMIN_JWT_SECRET=<32+ chars secret>`
+- `ADMIN_JWT_ISSUER=<optional issuer>`
+- `ADMIN_JWT_AUDIENCE=<optional audience>`
 - `SESSION_SECRET=<32+ chars secret>`
 - `CORS_ORIGIN=http://127.0.0.1:4173,https://admin.example.com`
 - `UPSTREAM_TIMEOUT_MS=30000`
@@ -117,6 +120,11 @@ bun run --cwd apps/edge-api d1:migrate:local
 - 推荐使用 `UPSTREAM_PROFILES_JSON` + `UPSTREAM_DEFAULT_PROFILE_ID` 定义多个 upstream profile
 - `relay_models.upstream_profile_id` 负责把模型绑定到某个 profile
 - 旧的 `OPENAI_*` 单 profile 环境变量仍可继续作为兼容入口
+- `AUTH_MODE=jwt` 下，管理接口通过 Bearer JWT 校验：
+  - 当前要求 `HS256`
+  - payload 至少满足 `role=admin` 或 `sub=admin`
+  - 同时校验 `exp`
+  - 若配置了 `ADMIN_JWT_ISSUER` 或 `ADMIN_JWT_AUDIENCE`，也会一并校验
 
 本地 D1 初始化流程：
 

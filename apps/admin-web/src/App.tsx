@@ -6,6 +6,7 @@ import {
   fetchAdminState,
   fetchAdminTokens,
   fetchAdminUsage,
+  getStoredAdminJwt,
   fetchModels,
   fetchSession,
   fetchStatus,
@@ -13,6 +14,8 @@ import {
   logout,
   saveAdminSettings,
   sendChatCompletion,
+  clearStoredAdminJwt,
+  storeAdminJwt,
   updateAdminToken,
   updateAdminModel,
   type AdminState,
@@ -45,11 +48,19 @@ function SessionPanel(props: {
   session: SessionData | null;
   pending: boolean;
   actionError: string | null;
+  initialJwtToken: string;
   onLogin: (token: string) => Promise<void>;
   onLogout: () => Promise<void>;
+  onApplyJwt: (token: string) => Promise<void>;
+  onClearJwt: () => Promise<void>;
 }) {
-  const { status, session, pending, actionError, onLogin, onLogout } = props;
+  const { status, session, pending, actionError, initialJwtToken, onLogin, onLogout, onApplyJwt, onClearJwt } = props;
   const [token, setToken] = useState('');
+  const [jwtToken, setJwtToken] = useState(initialJwtToken);
+
+  useEffect(() => {
+    setJwtToken(initialJwtToken);
+  }, [initialJwtToken]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,6 +86,49 @@ function SessionPanel(props: {
       <section className="panel panel-soft">
         <h2>认证状态</h2>
         <p>当前为 `AUTH_MODE=bearer`，需直接通过请求头访问保护接口。</p>
+      </section>
+    );
+  }
+
+  if (status.authMode === 'jwt') {
+    return (
+      <section className="panel panel-soft">
+        <div className="panel-header">
+          <h2>JWT 管理认证</h2>
+          {session?.authenticated ? <span className="badge">jwt active</span> : null}
+        </div>
+        <div className="stack">
+          <p>当前为 `AUTH_MODE=jwt`，管理接口通过 Bearer JWT 校验。</p>
+          <form
+            className="stack"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void onApplyJwt(jwtToken);
+            }}
+          >
+            <label className="label" htmlFor="admin-jwt">
+              输入 Bearer JWT
+            </label>
+            <textarea
+              id="admin-jwt"
+              className="input textarea"
+              disabled={pending}
+              onChange={(event) => setJwtToken(event.target.value)}
+              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              value={jwtToken}
+            />
+            <div className="toolbar">
+              <button className="action" disabled={pending || jwtToken.trim().length === 0} type="submit">
+                {pending ? '校验中...' : '应用 JWT'}
+              </button>
+              <button className="action action-secondary" disabled={pending} onClick={() => void onClearJwt()} type="button">
+                清除 JWT
+              </button>
+            </div>
+          </form>
+          {session?.authenticated ? <p>当前已通过 JWT 认证：admin</p> : <p className="meta-text">当前未通过 JWT 认证。</p>}
+          {actionError ? <p className="error-text">{actionError}</p> : null}
+        </div>
       </section>
     );
   }
@@ -715,6 +769,7 @@ export function App() {
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatResult, setChatResult] = useState<ChatCompletionResponse | null>(null);
   const [pending, setPending] = useState(false);
+  const [storedAdminJwt, setStoredAdminJwt] = useState('');
 
   async function refreshAdminState(nextSession?: SessionData | null) {
     const currentSession = nextSession ?? session;
@@ -860,6 +915,8 @@ export function App() {
     setChatError(null);
     try {
       await logout();
+      clearStoredAdminJwt();
+      setStoredAdminJwt('');
       setChatResult(null);
       setLatestCreatedToken(null);
       await refresh();
@@ -928,11 +985,63 @@ export function App() {
     }
   }
 
+  async function handleApplyJwt(token: string) {
+    setPending(true);
+    setActionError(null);
+    try {
+      storeAdminJwt(token);
+      setStoredAdminJwt(getStoredAdminJwt() ?? '');
+      const nextSession = await fetchSession();
+      setSession(nextSession);
+      if (!nextSession.authenticated) {
+        throw new Error('jwt 无效或未通过 admin 校验');
+      }
+      await refresh();
+    } catch (cause) {
+      clearStoredAdminJwt();
+      setStoredAdminJwt('');
+      setSession({
+        authenticated: false,
+        authMode: 'jwt'
+      });
+      setActionError(cause instanceof Error ? cause.message : 'jwt apply failed');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleClearJwt() {
+    setPending(true);
+    setActionError(null);
+    try {
+      clearStoredAdminJwt();
+      setStoredAdminJwt('');
+      setSession({
+        authenticated: false,
+        authMode: 'jwt'
+      });
+      setAdminState(null);
+      setAdminTokens([]);
+      setUsage(null);
+      setChatResult(null);
+      const [nextStatus, nextSession] = await Promise.all([fetchStatus(), fetchSession()]);
+      setStatus(nextStatus);
+      setSession(nextSession);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'jwt clear failed');
+    } finally {
+      setPending(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     void (async () => {
       try {
+        if (!cancelled) {
+          setStoredAdminJwt(getStoredAdminJwt() ?? '');
+        }
         const [nextStatus, nextSession] = await Promise.all([fetchStatus(), fetchSession()]);
         if (cancelled) {
           return;
@@ -1006,8 +1115,11 @@ export function App() {
       <div className="grid grid-two">
         <SessionPanel
           actionError={actionError}
+          initialJwtToken={storedAdminJwt}
           onLogin={handleLogin}
           onLogout={handleLogout}
+          onApplyJwt={handleApplyJwt}
+          onClearJwt={handleClearJwt}
           pending={pending}
           session={session}
           status={status}

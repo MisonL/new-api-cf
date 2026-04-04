@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import type { SessionInfo } from '../../../../packages/shared/src/contracts';
 import { ApiError } from './errors';
 import type { RuntimeConfig } from './config';
+import { readSessionFromJwt } from './jwt-auth';
 import { readSessionFromCookie } from './session';
 import { readBearerToken } from './token-auth';
 
@@ -49,6 +50,17 @@ export async function getSessionInfo(c: Context, config: RuntimeConfig): Promise
 
   if (config.authMode === 'bearer') {
     return getBearerSession(c, config);
+  }
+
+  if (config.authMode === 'jwt') {
+    if (!config.adminJwtSecret) {
+      throw new ApiError(503, 'ADMIN_JWT_SECRET_MISSING', 'ADMIN_JWT_SECRET is not configured');
+    }
+    const jwtSession = await readSessionFromJwt(c.req.header('Authorization'), config);
+    return jwtSession || {
+      authenticated: false,
+      authMode: 'jwt'
+    };
   }
 
   const session = await readSessionFromCookie(c.req.header('Cookie'), config.sessionSecret);
