@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": [
+      "@types/node"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "../../packages/shared/src/**/*.ts",
+    "worker-configuration.d.ts"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "new-api-cf-edge-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-04",
+  // 参考 Workers 最新最佳实践，新项目默认开启 nodejs_compat。
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "APP_NAME": "new-api-cf",
+    "AUTH_MODE": "disabled"
+  }
+}

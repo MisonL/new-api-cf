@@ -1,0 +1,19 @@
+{
+  "name": "new-api-cf",
+  "private": true,
+  "packageManager": "bun@1.2.21",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "bun run --cwd apps/admin-web dev",
+    "dev:edge": "bun run --cwd apps/edge-api dev",
+    "check:web": "bun run --cwd apps/admin-web check",
+    "deploy:edge": "bun run --cwd apps/edge-api deploy",
+    "types:edge": "bun run --cwd apps/edge-api types",
+    "check:shared": "bun run --cwd packages/shared check",
+    "check:edge": "bun run --cwd apps/edge-api check",
+    "check": "bun run types:edge && bun run check:shared && bun run check:edge && bun run check:web"
+  }
+}
