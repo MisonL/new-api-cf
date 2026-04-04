@@ -1,6 +1,7 @@
 import type {
   ChatCompletionRequestShape,
   ModelDescriptor,
+  ResponseCreateRequestShape,
   StateStoreKind
 } from '../../../../packages/shared/src/contracts';
 import { getUpstreamProfileById, profileSupportsModel, type RuntimeConfig } from './config';
@@ -86,10 +87,30 @@ export async function forwardChatCompletion(
   config: RuntimeConfig,
   access: RelayAccessContext
 ): Promise<Response> {
+  return forwardOpenAiRequest(env, '/chat/completions', request.model, request, config, access);
+}
+
+export async function forwardResponseCreate(
+  env: Env,
+  request: ResponseCreateRequestShape,
+  config: RuntimeConfig,
+  access: RelayAccessContext
+): Promise<Response> {
+  return forwardOpenAiRequest(env, '/responses', request.model, request, config, access);
+}
+
+async function forwardOpenAiRequest(
+  env: Env,
+  upstreamPath: string,
+  model: string,
+  request: unknown,
+  config: RuntimeConfig,
+  access: RelayAccessContext
+): Promise<Response> {
   ensureUpstreamReady(config);
   const catalog = await resolveModelCatalog(env, config);
-  assertModelAllowed(request.model, catalog.models, catalog.stateStore);
-  const profile = resolveUpstreamProfile(config, catalog.models, request.model);
+  assertModelAllowed(model, catalog.models, catalog.stateStore);
+  const profile = resolveUpstreamProfile(config, catalog.models, model);
 
   const baseUrl = normalizeBaseUrl(profile.baseUrl);
   const abortController = new AbortController();
@@ -97,7 +118,7 @@ export async function forwardChatCompletion(
   let upstreamResponse: Response;
 
   try {
-    upstreamResponse = await fetch(`${baseUrl}/chat/completions`, {
+    upstreamResponse = await fetch(`${baseUrl}${upstreamPath}`, {
       method: 'POST',
       headers: getUpstreamHeaders(profile.apiKey),
       body: JSON.stringify(request),
@@ -108,7 +129,7 @@ export async function forwardChatCompletion(
       await dispatchUsageEvent(env, {
         actor: access.usageActor,
         upstreamProfileId: profile.id,
-        model: request.model,
+        model,
         outcome: 'error',
         statusCode: 504
       });
@@ -120,7 +141,7 @@ export async function forwardChatCompletion(
     await dispatchUsageEvent(env, {
       actor: access.usageActor,
       upstreamProfileId: profile.id,
-      model: request.model,
+      model,
       outcome: 'error',
       statusCode: 502
     });
@@ -134,7 +155,7 @@ export async function forwardChatCompletion(
   await dispatchUsageEvent(env, {
     actor: access.usageActor,
     upstreamProfileId: profile.id,
-    model: request.model,
+    model,
     outcome: upstreamResponse.ok ? 'success' : 'error',
     statusCode: upstreamResponse.status
   });

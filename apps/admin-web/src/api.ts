@@ -142,6 +142,8 @@ export type ChatCompletionResponse = {
   }>;
 };
 
+export type ResponseCreateResult = Record<string, unknown>;
+
 const EDGE_API_BASE_URL = import.meta.env.VITE_EDGE_API_BASE_URL ?? '';
 const ADMIN_JWT_STORAGE_KEY = 'new-api-cf.admin-jwt';
 
@@ -270,6 +272,28 @@ export function sendChatCompletion(input: {
     body: JSON.stringify({
       model: input.model,
       messages
+    })
+  });
+}
+
+export function sendResponseCreate(input: {
+  model: string;
+  prompt: string;
+  systemPrompt?: string;
+  bearerToken?: string;
+}) {
+  const headers = new Headers();
+  if (input.bearerToken && input.bearerToken.trim().length > 0) {
+    headers.set('authorization', `Bearer ${input.bearerToken.trim()}`);
+  }
+
+  return request<ResponseCreateResult>('/v1/responses', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: input.model,
+      instructions: input.systemPrompt?.trim() || undefined,
+      input: input.prompt.trim()
     })
   });
 }

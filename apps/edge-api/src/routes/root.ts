@@ -21,7 +21,8 @@ export function createRootRouter() {
         '/api/me',
         '/api/models',
         '/v1/models',
-        '/v1/chat/completions'
+        '/v1/chat/completions',
+        '/v1/responses'
       ]
     });
   });

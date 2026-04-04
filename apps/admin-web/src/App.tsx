@@ -14,6 +14,7 @@ import {
   logout,
   saveAdminSettings,
   sendChatCompletion,
+  sendResponseCreate,
   clearStoredAdminJwt,
   storeAdminJwt,
   updateAdminToken,
@@ -23,6 +24,7 @@ import {
   type ApiTokenDescriptor,
   type ChatCompletionResponse,
   type ModelListData,
+  type ResponseCreateResult,
   type SessionData,
   type StatusData,
   type UsageOverview
@@ -31,7 +33,7 @@ import {
 const capabilityCards = [
   {
     title: 'OpenAI-Compatible Relay',
-    body: '当前主链已经提供 /v1/models 与 /v1/chat/completions，未配置上游时会显式失败。'
+    body: '当前主链已经提供 /v1/models、/v1/chat/completions 与 /v1/responses，未配置上游时会显式失败。'
   },
   {
     title: 'Session Login',
@@ -177,10 +179,16 @@ function PlaygroundPanel(props: {
   models: ModelListData | null;
   modelsError: string | null;
   pending: boolean;
-  chatResult: ChatCompletionResponse | null;
+  playgroundResult: ChatCompletionResponse | ResponseCreateResult | null;
   chatError: string | null;
   onReloadModels: () => Promise<void>;
-  onSend: (input: { model: string; prompt: string; systemPrompt: string; bearerToken?: string }) => Promise<void>;
+  onSend: (input: {
+    mode: 'chat' | 'responses';
+    model: string;
+    prompt: string;
+    systemPrompt: string;
+    bearerToken?: string;
+  }) => Promise<void>;
 }) {
   const {
     status,
@@ -189,7 +197,7 @@ function PlaygroundPanel(props: {
     models,
     modelsError,
     pending,
-    chatResult,
+    playgroundResult,
     chatError,
     onReloadModels,
     onSend
@@ -197,6 +205,7 @@ function PlaygroundPanel(props: {
   const [model, setModel] = useState('');
   const [prompt, setPrompt] = useState('用一句话说明你是一个 Cloudflare 上运行的最小 AI 网关。');
   const [systemPrompt, setSystemPrompt] = useState('你是一个简洁的系统说明助手。');
+  const [mode, setMode] = useState<'chat' | 'responses'>('responses');
   const [useApiToken, setUseApiToken] = useState(false);
   const [relayToken, setRelayToken] = useState('');
 
@@ -209,6 +218,7 @@ function PlaygroundPanel(props: {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onSend({
+      mode,
       model,
       prompt,
       systemPrompt,
@@ -236,6 +246,24 @@ function PlaygroundPanel(props: {
             刷新模型
           </button>
           <span className="meta-text">timeout {status.upstreamTimeoutMs} ms</span>
+        </div>
+        <div className="segmented">
+          <button
+            className={`chip ${mode === 'responses' ? 'chip-active' : ''}`}
+            disabled={pending}
+            onClick={() => setMode('responses')}
+            type="button"
+          >
+            /v1/responses
+          </button>
+          <button
+            className={`chip ${mode === 'chat' ? 'chip-active' : ''}`}
+            disabled={pending}
+            onClick={() => setMode('chat')}
+            type="button"
+          >
+            /v1/chat/completions
+          </button>
         </div>
         {modelsError ? <p className="error-text">{modelsError}</p> : null}
         {!playgroundEnabled ? <p className="error-text">当前 D1 设置已关闭 playground。</p> : null}
@@ -305,12 +333,12 @@ function PlaygroundPanel(props: {
             </>
           ) : null}
           <button className="action" disabled={pending || !playgroundEnabled || !model || prompt.trim().length === 0} type="submit">
-            {pending ? '请求中...' : '发送请求'}
+            {pending ? '请求中...' : `发送到 ${mode === 'responses' ? '/v1/responses' : '/v1/chat/completions'}`}
           </button>
         </form>
         {chatError ? <p className="error-text">{chatError}</p> : null}
         <pre className="status-block status-block-soft">
-          {JSON.stringify(chatResult ?? { message: '尚未发送请求' }, null, 2)}
+          {JSON.stringify(playgroundResult ?? { message: '尚未发送请求' }, null, 2)}
         </pre>
       </div>
     </section>
@@ -767,7 +795,7 @@ export function App() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [chatResult, setChatResult] = useState<ChatCompletionResponse | null>(null);
+  const [chatResult, setChatResult] = useState<ChatCompletionResponse | ResponseCreateResult | null>(null);
   const [pending, setPending] = useState(false);
   const [storedAdminJwt, setStoredAdminJwt] = useState('');
 
@@ -927,11 +955,19 @@ export function App() {
     }
   }
 
-  async function handleSend(input: { model: string; prompt: string; systemPrompt: string; bearerToken?: string }) {
+  async function handleSend(input: {
+    mode: 'chat' | 'responses';
+    model: string;
+    prompt: string;
+    systemPrompt: string;
+    bearerToken?: string;
+  }) {
     setPending(true);
     setChatError(null);
     try {
-      const result = await sendChatCompletion(input);
+      const result = input.mode === 'responses'
+        ? await sendResponseCreate(input)
+        : await sendChatCompletion(input);
       setChatResult(result);
       await refreshAdminUsage();
     } catch (cause) {
@@ -1140,7 +1176,7 @@ export function App() {
         <PlaygroundPanel
           adminState={adminState}
           chatError={chatError}
-          chatResult={chatResult}
+          playgroundResult={chatResult}
           latestCreatedToken={latestCreatedToken}
           models={models}
           modelsError={modelsError}

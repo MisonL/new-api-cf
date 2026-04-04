@@ -86,6 +86,14 @@ export interface ChatCompletionResponseShape {
   choices: ChatCompletionChoice[];
 }
 
+export interface ResponseCreateRequestShape {
+  model: string;
+  input: unknown;
+  instructions?: string;
+  stream?: boolean;
+  [key: string]: unknown;
+}
+
 export type StateStoreKind = 'env' | 'd1';
 
 export interface ControlSettingValues {

@@ -4,6 +4,7 @@ import { createAuthRouter } from './routes/auth';
 import { createAdminRouter } from './routes/admin';
 import { createChatRouter } from './routes/chat';
 import { createModelRouter } from './routes/models';
+import { createResponsesRouter } from './routes/responses';
 import { createRootRouter } from './routes/root';
 import { createStatusRouter } from './routes/status';
 import { corsMiddleware } from './lib/cors';
@@ -25,6 +26,7 @@ app.route('/', createAuthRouter());
 app.route('/', createAdminRouter());
 app.route('/', createModelRouter());
 app.route('/', createChatRouter());
+app.route('/', createResponsesRouter());
 
 app.onError((cause, c) => {
   if (cause instanceof ApiError) {
