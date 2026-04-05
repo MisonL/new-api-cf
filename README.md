@@ -74,6 +74,10 @@
   - `POST /v1/images/variations`
   - `POST /v1/moderations`
   - `POST /v1/responses`
+  - `GET /v1/responses/:responseId`
+  - `DELETE /v1/responses/:responseId`
+  - `POST /v1/responses/:responseId/cancel`
+  - `GET /v1/responses/:responseId/input_items`
 - `apps/admin-web`
   - React + Vite 前端骨架
   - 登录面板

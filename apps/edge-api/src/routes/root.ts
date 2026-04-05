@@ -50,7 +50,10 @@ export function createRootRouter() {
         '/v1/images/generations',
         '/v1/images/variations',
         '/v1/moderations',
-        '/v1/responses'
+        '/v1/responses',
+        '/v1/responses/:responseId',
+        '/v1/responses/:responseId/cancel',
+        '/v1/responses/:responseId/input_items'
       ]
     });
   });
