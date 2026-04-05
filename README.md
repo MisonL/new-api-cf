@@ -54,6 +54,15 @@
   - `GET /v1/vector_stores/:vectorStoreId`
   - `DELETE /v1/vector_stores/:vectorStoreId`
   - `POST /v1/vector_stores/:vectorStoreId/search`
+  - `GET /v1/vector_stores/:vectorStoreId/files`
+  - `POST /v1/vector_stores/:vectorStoreId/files`
+  - `GET /v1/vector_stores/:vectorStoreId/files/:fileId`
+  - `DELETE /v1/vector_stores/:vectorStoreId/files/:fileId`
+  - `GET /v1/vector_stores/:vectorStoreId/file_batches`
+  - `POST /v1/vector_stores/:vectorStoreId/file_batches`
+  - `GET /v1/vector_stores/:vectorStoreId/file_batches/:batchId`
+  - `POST /v1/vector_stores/:vectorStoreId/file_batches/:batchId/cancel`
+  - `GET /v1/vector_stores/:vectorStoreId/file_batches/:batchId/files`
   - `POST /v1/audio/speech`
   - `POST /v1/audio/transcriptions`
   - `POST /v1/audio/translations`

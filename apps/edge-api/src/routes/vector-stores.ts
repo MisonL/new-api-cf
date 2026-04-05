@@ -16,6 +16,19 @@ const vectorStoreSearchRequestSchema = z.object({
   query: z.string().min(1)
 }).passthrough();
 
+const createVectorStoreFileRequestSchema = z.object({
+  file_id: z.string().min(1),
+  attributes: z.record(z.string(), z.unknown()).optional(),
+  chunking_strategy: z.record(z.string(), z.unknown()).optional()
+}).passthrough();
+
+const createVectorStoreFileBatchRequestSchema = z.object({
+  file_ids: z.array(z.string().min(1)).optional(),
+  files: z.array(z.record(z.string(), z.unknown())).optional(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
+  chunking_strategy: z.record(z.string(), z.unknown()).optional()
+}).passthrough();
+
 function buildQueryString(url: URL) {
   return url.search ? url.search : '';
 }
@@ -76,6 +89,89 @@ export function createVectorStoresRouter() {
       },
       body: JSON.stringify(request)
     }, config);
+  });
+
+  router.get('/v1/vector_stores/:vectorStoreId/files', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/files${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
+  });
+
+  router.post('/v1/vector_stores/:vectorStoreId/files', async (c) => {
+    const payload = await c.req.json().catch(() => {
+      throw new ApiError(400, 'INVALID_JSON', 'request body must be valid JSON');
+    });
+    const request = createVectorStoreFileRequestSchema.parse(payload);
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/files`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }, config);
+  });
+
+  router.get('/v1/vector_stores/:vectorStoreId/files/:fileId', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/files/${encodeURIComponent(c.req.param('fileId'))}`, { method: 'GET' }, config);
+  });
+
+  router.delete('/v1/vector_stores/:vectorStoreId/files/:fileId', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/files/${encodeURIComponent(c.req.param('fileId'))}`, { method: 'DELETE' }, config);
+  });
+
+  router.get('/v1/vector_stores/:vectorStoreId/file_batches', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/file_batches${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
+  });
+
+  router.post('/v1/vector_stores/:vectorStoreId/file_batches', async (c) => {
+    const payload = await c.req.json().catch(() => {
+      throw new ApiError(400, 'INVALID_JSON', 'request body must be valid JSON');
+    });
+    const request = createVectorStoreFileBatchRequestSchema.parse(payload);
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/file_batches`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }, config);
+  });
+
+  router.get('/v1/vector_stores/:vectorStoreId/file_batches/:batchId', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/file_batches/${encodeURIComponent(c.req.param('batchId'))}`, { method: 'GET' }, config);
+  });
+
+  router.post('/v1/vector_stores/:vectorStoreId/file_batches/:batchId/cancel', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/file_batches/${encodeURIComponent(c.req.param('batchId'))}/cancel`, { method: 'POST' }, config);
+  });
+
+  router.get('/v1/vector_stores/:vectorStoreId/file_batches/:batchId/files', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/file_batches/${encodeURIComponent(c.req.param('batchId'))}/files${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
   });
 
   return router;
