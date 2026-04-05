@@ -56,6 +56,7 @@
   - `GET /v1/vector_stores`
   - `POST /v1/vector_stores`
   - `GET /v1/vector_stores/:vectorStoreId`
+  - `POST /v1/vector_stores/:vectorStoreId`
   - `DELETE /v1/vector_stores/:vectorStoreId`
   - `POST /v1/vector_stores/:vectorStoreId/search`
   - `GET /v1/vector_stores/:vectorStoreId/files`

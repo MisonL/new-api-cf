@@ -16,6 +16,8 @@ const vectorStoreSearchRequestSchema = z.object({
   query: z.string().min(1)
 }).passthrough();
 
+const updateVectorStoreRequestSchema = z.object({}).passthrough();
+
 const createVectorStoreFileRequestSchema = z.object({
   file_id: z.string().min(1),
   attributes: z.record(z.string(), z.unknown()).optional(),
@@ -69,6 +71,23 @@ export function createVectorStoresRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}`, { method: 'GET' }, config);
+  });
+
+  router.post('/v1/vector_stores/:vectorStoreId', async (c) => {
+    const payload = await c.req.json().catch(() => {
+      throw new ApiError(400, 'INVALID_JSON', 'request body must be valid JSON');
+    });
+    const request = updateVectorStoreRequestSchema.parse(payload);
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }, config);
   });
 
   router.delete('/v1/vector_stores/:vectorStoreId', async (c) => {
