@@ -13,6 +13,7 @@ import {
   login,
   logout,
   saveAdminSettings,
+  sendImageEdit,
   sendSpeechCreate,
   sendTranscriptionCreate,
   sendTranslationCreate,
@@ -50,6 +51,7 @@ type PlaygroundMode =
   | 'completions'
   | 'embeddings'
   | 'images'
+  | 'image-edits'
   | 'speech'
   | 'transcriptions'
   | 'translations'
@@ -73,7 +75,7 @@ function isSpeechCreateResult(value: PlaygroundResult | null): value is SpeechCr
 const capabilityCards = [
   {
     title: 'OpenAI-Compatible Relay',
-    body: '当前主链已经提供 /v1/models、/v1/audio/speech、/v1/audio/transcriptions、/v1/audio/translations、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/generations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
+    body: '当前主链已经提供 /v1/models、/v1/audio/speech、/v1/audio/transcriptions、/v1/audio/translations、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/edits、/v1/images/generations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
   },
   {
     title: 'Session Login',
@@ -271,6 +273,8 @@ function PlaygroundPanel(props: {
           ? '/v1/completions'
         : mode === 'embeddings'
           ? '/v1/embeddings'
+          : mode === 'image-edits'
+            ? '/v1/images/edits'
           : mode === 'images'
             ? '/v1/images/generations'
           : '/v1/moderations';
@@ -374,6 +378,14 @@ function PlaygroundPanel(props: {
             /v1/embeddings
           </button>
           <button
+            className={`chip ${mode === 'image-edits' ? 'chip-active' : ''}`}
+            disabled={pending}
+            onClick={() => setMode('image-edits')}
+            type="button"
+          >
+            /v1/images/edits
+          </button>
+          <button
             className={`chip ${mode === 'images' ? 'chip-active' : ''}`}
             disabled={pending}
             onClick={() => setMode('images')}
@@ -447,18 +459,21 @@ function PlaygroundPanel(props: {
               </select>
             </>
           ) : null}
-          {mode === 'transcriptions' || mode === 'translations' ? (
+          {mode === 'transcriptions' || mode === 'translations' || mode === 'image-edits' ? (
             <>
               <label className="label" htmlFor="audio-file">
-                Audio File
+                {mode === 'image-edits' ? 'Image File' : 'Audio File'}
               </label>
               <input
                 id="audio-file"
                 className="input"
                 disabled={pending}
+                accept={mode === 'image-edits' ? 'image/*' : undefined}
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
                 type="file"
               />
+              {mode === 'image-edits' ? null : (
+                <>
               <label className="label" htmlFor="transcription-language">
                 Language
               </label>
@@ -470,6 +485,8 @@ function PlaygroundPanel(props: {
                 placeholder={mode === 'translations' ? 'translations 不需要 language' : '例如 zh 或 en'}
                 value={language}
               />
+                </>
+              )}
             </>
           ) : null}
           <label className="label" htmlFor="user-prompt">
@@ -481,6 +498,8 @@ function PlaygroundPanel(props: {
                   ? 'Transcription Prompt'
                   : mode === 'translations'
                     ? 'Translation Prompt'
+                    : mode === 'image-edits'
+                      ? 'Edit Prompt'
                 : mode === 'images'
                   ? 'Image Prompt'
                 : mode === 'moderations'
@@ -523,7 +542,7 @@ function PlaygroundPanel(props: {
           ) : null}
           <button
             className="action"
-            disabled={pending || !playgroundEnabled || !model || ((mode === 'transcriptions' || mode === 'translations') ? !file : prompt.trim().length === 0)}
+            disabled={pending || !playgroundEnabled || !model || ((mode === 'transcriptions' || mode === 'translations' || mode === 'image-edits') ? !file || prompt.trim().length === 0 : prompt.trim().length === 0)}
             type="submit"
           >
             {pending ? '请求中...' : `发送到 ${endpointLabel}`}
@@ -1197,6 +1216,16 @@ export function App() {
           model: input.model,
           file: input.file,
           prompt: input.prompt,
+          bearerToken: input.bearerToken
+        });
+      } else if (input.mode === 'image-edits') {
+        if (!input.file) {
+          throw new Error('image edit file is required');
+        }
+        result = await sendImageEdit({
+          model: input.model,
+          prompt: input.prompt,
+          file: input.file,
           bearerToken: input.bearerToken
         });
       } else if (input.mode === 'images') {

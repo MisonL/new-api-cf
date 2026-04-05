@@ -464,6 +464,30 @@ export function sendImageGeneration(input: {
   });
 }
 
+export function sendImageEdit(input: {
+  model: string;
+  prompt: string;
+  file: File;
+  bearerToken?: string;
+}) {
+  const headers = new Headers();
+  if (input.bearerToken && input.bearerToken.trim().length > 0) {
+    headers.set('authorization', `Bearer ${input.bearerToken.trim()}`);
+  }
+
+  const formData = new FormData();
+  formData.set('model', input.model);
+  formData.set('image', input.file);
+  formData.set('prompt', input.prompt.trim());
+  formData.set('response_format', 'url');
+
+  return request<ImageGenerationResult>('/v1/images/edits', {
+    method: 'POST',
+    headers,
+    body: formData
+  });
+}
+
 export function sendSpeechCreate(input: {
   model: string;
   prompt: string;

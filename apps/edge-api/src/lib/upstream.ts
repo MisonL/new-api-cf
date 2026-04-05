@@ -2,6 +2,7 @@ import type {
   ChatCompletionRequestShape,
   CompletionCreateRequestShape,
   EmbeddingsCreateRequestShape,
+  ImageEditRequestShape,
   ImageGenerationRequestShape,
   ModelDescriptor,
   ModerationsCreateRequestShape,
@@ -140,6 +141,16 @@ export async function forwardImageGeneration(
   access: RelayAccessContext
 ): Promise<Response> {
   return forwardOpenAiRequest(env, '/images/generations', request.model, request, config, access);
+}
+
+export async function forwardImageEdit(
+  env: Env,
+  model: string,
+  request: FormData,
+  config: RuntimeConfig,
+  access: RelayAccessContext
+): Promise<Response> {
+  return forwardOpenAiRequest(env, '/images/edits', model, request, config, access, undefined);
 }
 
 export async function forwardSpeechCreate(
