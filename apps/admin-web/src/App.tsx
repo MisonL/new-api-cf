@@ -14,6 +14,7 @@ import {
   logout,
   saveAdminSettings,
   sendSpeechCreate,
+  sendTranscriptionCreate,
   sendChatCompletion,
   sendCompletionCreate,
   sendEmbeddingsCreate,
@@ -37,10 +38,19 @@ import {
   type SessionData,
   type SpeechCreateResult,
   type StatusData,
+  type TranscriptionCreateResult,
   type UsageOverview
 } from './api';
 
-type PlaygroundMode = 'chat' | 'responses' | 'completions' | 'embeddings' | 'images' | 'speech' | 'moderations';
+type PlaygroundMode =
+  | 'chat'
+  | 'responses'
+  | 'completions'
+  | 'embeddings'
+  | 'images'
+  | 'speech'
+  | 'transcriptions'
+  | 'moderations';
 
 type PlaygroundResult =
   | ChatCompletionResponse
@@ -49,6 +59,7 @@ type PlaygroundResult =
   | EmbeddingsCreateResult
   | ImageGenerationResult
   | SpeechCreateResult
+  | TranscriptionCreateResult
   | ModerationsCreateResult;
 
 function isSpeechCreateResult(value: PlaygroundResult | null): value is SpeechCreateResult {
@@ -58,7 +69,7 @@ function isSpeechCreateResult(value: PlaygroundResult | null): value is SpeechCr
 const capabilityCards = [
   {
     title: 'OpenAI-Compatible Relay',
-    body: '当前主链已经提供 /v1/models、/v1/audio/speech、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/generations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
+    body: '当前主链已经提供 /v1/models、/v1/audio/speech、/v1/audio/transcriptions、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/generations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
   },
   {
     title: 'Session Login',
@@ -213,6 +224,8 @@ function PlaygroundPanel(props: {
     prompt: string;
     systemPrompt: string;
     voice: string;
+    file: File | null;
+    language: string;
     bearerToken?: string;
   }) => Promise<void>;
 }) {
@@ -233,6 +246,8 @@ function PlaygroundPanel(props: {
   const [systemPrompt, setSystemPrompt] = useState('你是一个简洁的系统说明助手。');
   const [mode, setMode] = useState<PlaygroundMode>('responses');
   const [voice, setVoice] = useState('alloy');
+  const [file, setFile] = useState<File | null>(null);
+  const [language, setLanguage] = useState('');
   const [useApiToken, setUseApiToken] = useState(false);
   const [relayToken, setRelayToken] = useState('');
 
@@ -244,6 +259,8 @@ function PlaygroundPanel(props: {
         ? '/v1/chat/completions'
         : mode === 'speech'
           ? '/v1/audio/speech'
+        : mode === 'transcriptions'
+          ? '/v1/audio/transcriptions'
         : mode === 'completions'
           ? '/v1/completions'
         : mode === 'embeddings'
@@ -266,6 +283,8 @@ function PlaygroundPanel(props: {
       prompt,
       systemPrompt,
       voice,
+      file,
+      language,
       bearerToken: useApiToken ? relayToken : undefined
     });
   }
@@ -315,6 +334,14 @@ function PlaygroundPanel(props: {
             type="button"
           >
             /v1/audio/speech
+          </button>
+          <button
+            className={`chip ${mode === 'transcriptions' ? 'chip-active' : ''}`}
+            disabled={pending}
+            onClick={() => setMode('transcriptions')}
+            type="button"
+          >
+            /v1/audio/transcriptions
           </button>
           <button
             className={`chip ${mode === 'completions' ? 'chip-active' : ''}`}
@@ -406,13 +433,40 @@ function PlaygroundPanel(props: {
               </select>
             </>
           ) : null}
+          {mode === 'transcriptions' ? (
+            <>
+              <label className="label" htmlFor="audio-file">
+                Audio File
+              </label>
+              <input
+                id="audio-file"
+                className="input"
+                disabled={pending}
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                type="file"
+              />
+              <label className="label" htmlFor="transcription-language">
+                Language
+              </label>
+              <input
+                id="transcription-language"
+                className="input"
+                disabled={pending}
+                onChange={(event) => setLanguage(event.target.value)}
+                placeholder="例如 zh 或 en"
+                value={language}
+              />
+            </>
+          ) : null}
           <label className="label" htmlFor="user-prompt">
             {mode === 'embeddings'
               ? 'Embedding Input'
               : mode === 'speech'
                 ? 'Speech Input'
-              : mode === 'images'
-                ? 'Image Prompt'
+                : mode === 'transcriptions'
+                  ? 'Transcription Prompt'
+                : mode === 'images'
+                  ? 'Image Prompt'
                 : mode === 'moderations'
                   ? 'Moderation Input'
                   : mode === 'completions'
@@ -424,6 +478,7 @@ function PlaygroundPanel(props: {
             className="input textarea"
             disabled={pending}
             onChange={(event) => setPrompt(event.target.value)}
+            placeholder={mode === 'transcriptions' ? '可选：补充上下文提示词' : undefined}
             value={prompt}
           />
           <label className="checkbox-row">
@@ -450,7 +505,11 @@ function PlaygroundPanel(props: {
               />
             </>
           ) : null}
-          <button className="action" disabled={pending || !playgroundEnabled || !model || prompt.trim().length === 0} type="submit">
+          <button
+            className="action"
+            disabled={pending || !playgroundEnabled || !model || (mode === 'transcriptions' ? !file : prompt.trim().length === 0)}
+            type="submit"
+          >
             {pending ? '请求中...' : `发送到 ${endpointLabel}`}
           </button>
         </form>
@@ -1087,24 +1146,40 @@ export function App() {
     prompt: string;
     systemPrompt: string;
     voice: string;
+    file: File | null;
+    language: string;
     bearerToken?: string;
   }) {
     setPending(true);
     setChatError(null);
     try {
-      const result = input.mode === 'responses'
-        ? await sendResponseCreate(input)
-        : input.mode === 'completions'
-          ? await sendCompletionCreate(input)
-        : input.mode === 'embeddings'
-          ? await sendEmbeddingsCreate(input)
-          : input.mode === 'speech'
-            ? await sendSpeechCreate(input)
-          : input.mode === 'images'
-            ? await sendImageGeneration(input)
-          : input.mode === 'moderations'
-            ? await sendModerationsCreate(input)
-            : await sendChatCompletion(input);
+      let result: PlaygroundResult;
+      if (input.mode === 'responses') {
+        result = await sendResponseCreate(input);
+      } else if (input.mode === 'completions') {
+        result = await sendCompletionCreate(input);
+      } else if (input.mode === 'embeddings') {
+        result = await sendEmbeddingsCreate(input);
+      } else if (input.mode === 'speech') {
+        result = await sendSpeechCreate(input);
+      } else if (input.mode === 'transcriptions') {
+        if (!input.file) {
+          throw new Error('transcription file is required');
+        }
+        result = await sendTranscriptionCreate({
+          model: input.model,
+          file: input.file,
+          language: input.language,
+          prompt: input.prompt,
+          bearerToken: input.bearerToken
+        });
+      } else if (input.mode === 'images') {
+        result = await sendImageGeneration(input);
+      } else if (input.mode === 'moderations') {
+        result = await sendModerationsCreate(input);
+      } else {
+        result = await sendChatCompletion(input);
+      }
       setChatResult(result);
       await refreshAdminUsage();
     } catch (cause) {

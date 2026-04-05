@@ -19,11 +19,13 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 }
 
-function getUpstreamHeaders(apiKey: string) {
-  return {
-    'content-type': 'application/json',
-    authorization: `Bearer ${apiKey}`
-  };
+function getUpstreamHeaders(apiKey: string, contentType?: string) {
+  const headers = new Headers();
+  headers.set('authorization', `Bearer ${apiKey}`);
+  if (contentType) {
+    headers.set('content-type', contentType);
+  }
+  return headers;
 }
 
 export function buildModelList(config: RuntimeConfig): ModelDescriptor[] {
@@ -149,13 +151,24 @@ export async function forwardSpeechCreate(
   return forwardOpenAiRequest(env, '/audio/speech', request.model, request, config, access);
 }
 
+export async function forwardTranscriptionCreate(
+  env: Env,
+  model: string,
+  request: FormData,
+  config: RuntimeConfig,
+  access: RelayAccessContext
+): Promise<Response> {
+  return forwardOpenAiRequest(env, '/audio/transcriptions', model, request, config, access, undefined);
+}
+
 async function forwardOpenAiRequest(
   env: Env,
   upstreamPath: string,
   model: string,
-  request: unknown,
+  request: FormData | unknown,
   config: RuntimeConfig,
-  access: RelayAccessContext
+  access: RelayAccessContext,
+  requestContentType = 'application/json'
 ): Promise<Response> {
   ensureUpstreamReady(config);
   const catalog = await resolveModelCatalog(env, config);
@@ -170,8 +183,8 @@ async function forwardOpenAiRequest(
   try {
     upstreamResponse = await fetch(`${baseUrl}${upstreamPath}`, {
       method: 'POST',
-      headers: getUpstreamHeaders(profile.apiKey),
-      body: JSON.stringify(request),
+      headers: getUpstreamHeaders(profile.apiKey, request instanceof FormData ? undefined : requestContentType),
+      body: request instanceof FormData ? request : JSON.stringify(request),
       signal: abortController.signal
     });
   } catch (cause) {

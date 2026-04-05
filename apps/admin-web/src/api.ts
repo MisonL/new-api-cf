@@ -191,6 +191,11 @@ export type SpeechCreateResult = {
   bytes: number;
 };
 
+export type TranscriptionCreateResult = {
+  text?: string;
+  [key: string]: unknown;
+};
+
 const EDGE_API_BASE_URL = import.meta.env.VITE_EDGE_API_BASE_URL ?? '';
 const ADMIN_JWT_STORAGE_KEY = 'new-api-cf.admin-jwt';
 
@@ -231,7 +236,7 @@ export function getStoredAdminJwt() {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
-  if (init?.body) {
+  if (init?.body && !(typeof FormData !== 'undefined' && init.body instanceof FormData)) {
     headers.set('content-type', 'application/json');
   }
   if (!headers.has('authorization')) {
@@ -258,7 +263,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 async function requestBinary(path: string, init?: RequestInit): Promise<SpeechCreateResult> {
   const headers = new Headers(init?.headers);
-  if (init?.body) {
+  if (init?.body && !(typeof FormData !== 'undefined' && init.body instanceof FormData)) {
     headers.set('content-type', 'application/json');
   }
   if (!headers.has('authorization')) {
@@ -476,6 +481,36 @@ export function sendSpeechCreate(input: {
       input: input.prompt.trim(),
       voice: input.voice.trim() || 'alloy'
     })
+  });
+}
+
+export function sendTranscriptionCreate(input: {
+  model: string;
+  file: File;
+  language?: string;
+  prompt?: string;
+  bearerToken?: string;
+}) {
+  const headers = new Headers();
+  if (input.bearerToken && input.bearerToken.trim().length > 0) {
+    headers.set('authorization', `Bearer ${input.bearerToken.trim()}`);
+  }
+
+  const formData = new FormData();
+  formData.set('model', input.model);
+  formData.set('file', input.file);
+  formData.set('response_format', 'json');
+  if (input.language && input.language.trim().length > 0) {
+    formData.set('language', input.language.trim());
+  }
+  if (input.prompt && input.prompt.trim().length > 0) {
+    formData.set('prompt', input.prompt.trim());
+  }
+
+  return request<TranscriptionCreateResult>('/v1/audio/transcriptions', {
+    method: 'POST',
+    headers,
+    body: formData
   });
 }
 
