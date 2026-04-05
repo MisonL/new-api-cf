@@ -15,6 +15,7 @@ import {
   saveAdminSettings,
   sendSpeechCreate,
   sendTranscriptionCreate,
+  sendTranslationCreate,
   sendChatCompletion,
   sendCompletionCreate,
   sendEmbeddingsCreate,
@@ -38,6 +39,7 @@ import {
   type SessionData,
   type SpeechCreateResult,
   type StatusData,
+  type TranslationCreateResult,
   type TranscriptionCreateResult,
   type UsageOverview
 } from './api';
@@ -50,6 +52,7 @@ type PlaygroundMode =
   | 'images'
   | 'speech'
   | 'transcriptions'
+  | 'translations'
   | 'moderations';
 
 type PlaygroundResult =
@@ -60,6 +63,7 @@ type PlaygroundResult =
   | ImageGenerationResult
   | SpeechCreateResult
   | TranscriptionCreateResult
+  | TranslationCreateResult
   | ModerationsCreateResult;
 
 function isSpeechCreateResult(value: PlaygroundResult | null): value is SpeechCreateResult {
@@ -69,7 +73,7 @@ function isSpeechCreateResult(value: PlaygroundResult | null): value is SpeechCr
 const capabilityCards = [
   {
     title: 'OpenAI-Compatible Relay',
-    body: '当前主链已经提供 /v1/models、/v1/audio/speech、/v1/audio/transcriptions、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/generations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
+    body: '当前主链已经提供 /v1/models、/v1/audio/speech、/v1/audio/transcriptions、/v1/audio/translations、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/generations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
   },
   {
     title: 'Session Login',
@@ -261,6 +265,8 @@ function PlaygroundPanel(props: {
           ? '/v1/audio/speech'
         : mode === 'transcriptions'
           ? '/v1/audio/transcriptions'
+        : mode === 'translations'
+          ? '/v1/audio/translations'
         : mode === 'completions'
           ? '/v1/completions'
         : mode === 'embeddings'
@@ -342,6 +348,14 @@ function PlaygroundPanel(props: {
             type="button"
           >
             /v1/audio/transcriptions
+          </button>
+          <button
+            className={`chip ${mode === 'translations' ? 'chip-active' : ''}`}
+            disabled={pending}
+            onClick={() => setMode('translations')}
+            type="button"
+          >
+            /v1/audio/translations
           </button>
           <button
             className={`chip ${mode === 'completions' ? 'chip-active' : ''}`}
@@ -433,7 +447,7 @@ function PlaygroundPanel(props: {
               </select>
             </>
           ) : null}
-          {mode === 'transcriptions' ? (
+          {mode === 'transcriptions' || mode === 'translations' ? (
             <>
               <label className="label" htmlFor="audio-file">
                 Audio File
@@ -451,9 +465,9 @@ function PlaygroundPanel(props: {
               <input
                 id="transcription-language"
                 className="input"
-                disabled={pending}
+                disabled={pending || mode === 'translations'}
                 onChange={(event) => setLanguage(event.target.value)}
-                placeholder="例如 zh 或 en"
+                placeholder={mode === 'translations' ? 'translations 不需要 language' : '例如 zh 或 en'}
                 value={language}
               />
             </>
@@ -465,6 +479,8 @@ function PlaygroundPanel(props: {
                 ? 'Speech Input'
                 : mode === 'transcriptions'
                   ? 'Transcription Prompt'
+                  : mode === 'translations'
+                    ? 'Translation Prompt'
                 : mode === 'images'
                   ? 'Image Prompt'
                 : mode === 'moderations'
@@ -478,7 +494,7 @@ function PlaygroundPanel(props: {
             className="input textarea"
             disabled={pending}
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder={mode === 'transcriptions' ? '可选：补充上下文提示词' : undefined}
+            placeholder={mode === 'transcriptions' || mode === 'translations' ? '可选：补充上下文提示词' : undefined}
             value={prompt}
           />
           <label className="checkbox-row">
@@ -507,7 +523,7 @@ function PlaygroundPanel(props: {
           ) : null}
           <button
             className="action"
-            disabled={pending || !playgroundEnabled || !model || (mode === 'transcriptions' ? !file : prompt.trim().length === 0)}
+            disabled={pending || !playgroundEnabled || !model || ((mode === 'transcriptions' || mode === 'translations') ? !file : prompt.trim().length === 0)}
             type="submit"
           >
             {pending ? '请求中...' : `发送到 ${endpointLabel}`}
@@ -1170,6 +1186,16 @@ export function App() {
           model: input.model,
           file: input.file,
           language: input.language,
+          prompt: input.prompt,
+          bearerToken: input.bearerToken
+        });
+      } else if (input.mode === 'translations') {
+        if (!input.file) {
+          throw new Error('translation file is required');
+        }
+        result = await sendTranslationCreate({
+          model: input.model,
+          file: input.file,
           prompt: input.prompt,
           bearerToken: input.bearerToken
         });

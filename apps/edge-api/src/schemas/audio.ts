@@ -38,3 +38,24 @@ export function parseTranscriptionRequest(formData: FormData): TranscriptionCrea
     temperature: typeof rawTemperature === 'string' && rawTemperature.trim() ? Number(rawTemperature) : undefined
   });
 }
+
+export const translationCreateRequestSchema = z.object({
+  model: z.string().min(1),
+  file: transcriptionFileSchema,
+  prompt: z.string().min(1).optional(),
+  response_format: transcriptionResponseFormatSchema.optional(),
+  temperature: z.number().min(0).max(1).optional()
+});
+
+export type TranslationCreateRequestInput = z.infer<typeof translationCreateRequestSchema>;
+
+export function parseTranslationRequest(formData: FormData): TranslationCreateRequestInput {
+  const rawTemperature = formData.get('temperature');
+  return translationCreateRequestSchema.parse({
+    model: formData.get('model'),
+    file: formData.get('file'),
+    prompt: formData.get('prompt') || undefined,
+    response_format: formData.get('response_format') || undefined,
+    temperature: typeof rawTemperature === 'string' && rawTemperature.trim() ? Number(rawTemperature) : undefined
+  });
+}

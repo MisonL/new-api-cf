@@ -196,6 +196,8 @@ export type TranscriptionCreateResult = {
   [key: string]: unknown;
 };
 
+export type TranslationCreateResult = TranscriptionCreateResult;
+
 const EDGE_API_BASE_URL = import.meta.env.VITE_EDGE_API_BASE_URL ?? '';
 const ADMIN_JWT_STORAGE_KEY = 'new-api-cf.admin-jwt';
 
@@ -508,6 +510,32 @@ export function sendTranscriptionCreate(input: {
   }
 
   return request<TranscriptionCreateResult>('/v1/audio/transcriptions', {
+    method: 'POST',
+    headers,
+    body: formData
+  });
+}
+
+export function sendTranslationCreate(input: {
+  model: string;
+  file: File;
+  prompt?: string;
+  bearerToken?: string;
+}) {
+  const headers = new Headers();
+  if (input.bearerToken && input.bearerToken.trim().length > 0) {
+    headers.set('authorization', `Bearer ${input.bearerToken.trim()}`);
+  }
+
+  const formData = new FormData();
+  formData.set('model', input.model);
+  formData.set('file', input.file);
+  formData.set('response_format', 'json');
+  if (input.prompt && input.prompt.trim().length > 0) {
+    formData.set('prompt', input.prompt.trim());
+  }
+
+  return request<TranslationCreateResult>('/v1/audio/translations', {
     method: 'POST',
     headers,
     body: formData

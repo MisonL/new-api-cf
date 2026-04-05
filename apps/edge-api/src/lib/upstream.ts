@@ -161,6 +161,16 @@ export async function forwardTranscriptionCreate(
   return forwardOpenAiRequest(env, '/audio/transcriptions', model, request, config, access, undefined);
 }
 
+export async function forwardTranslationCreate(
+  env: Env,
+  model: string,
+  request: FormData,
+  config: RuntimeConfig,
+  access: RelayAccessContext
+): Promise<Response> {
+  return forwardOpenAiRequest(env, '/audio/translations', model, request, config, access, undefined);
+}
+
 async function forwardOpenAiRequest(
   env: Env,
   upstreamPath: string,
