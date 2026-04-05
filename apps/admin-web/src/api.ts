@@ -158,6 +158,12 @@ export type EmbeddingsCreateResult = {
   };
 };
 
+export type ModerationsCreateResult = {
+  id?: string;
+  model?: string;
+  results: Array<Record<string, unknown>>;
+};
+
 const EDGE_API_BASE_URL = import.meta.env.VITE_EDGE_API_BASE_URL ?? '';
 const ADMIN_JWT_STORAGE_KEY = 'new-api-cf.admin-jwt';
 
@@ -323,6 +329,26 @@ export function sendEmbeddingsCreate(input: {
   }
 
   return request<EmbeddingsCreateResult>('/v1/embeddings', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: input.model,
+      input: input.prompt.trim()
+    })
+  });
+}
+
+export function sendModerationsCreate(input: {
+  model: string;
+  prompt: string;
+  bearerToken?: string;
+}) {
+  const headers = new Headers();
+  if (input.bearerToken && input.bearerToken.trim().length > 0) {
+    headers.set('authorization', `Bearer ${input.bearerToken.trim()}`);
+  }
+
+  return request<ModerationsCreateResult>('/v1/moderations', {
     method: 'POST',
     headers,
     body: JSON.stringify({

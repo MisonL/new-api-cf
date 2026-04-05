@@ -15,6 +15,7 @@ import {
   saveAdminSettings,
   sendChatCompletion,
   sendEmbeddingsCreate,
+  sendModerationsCreate,
   sendResponseCreate,
   clearStoredAdminJwt,
   storeAdminJwt,
@@ -26,6 +27,7 @@ import {
   type ChatCompletionResponse,
   type EmbeddingsCreateResult,
   type ModelListData,
+  type ModerationsCreateResult,
   type ResponseCreateResult,
   type SessionData,
   type StatusData,
@@ -35,7 +37,7 @@ import {
 const capabilityCards = [
   {
     title: 'OpenAI-Compatible Relay',
-    body: '当前主链已经提供 /v1/models、/v1/chat/completions、/v1/embeddings 与 /v1/responses，未配置上游时会显式失败。'
+    body: '当前主链已经提供 /v1/models、/v1/chat/completions、/v1/embeddings、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
   },
   {
     title: 'Session Login',
@@ -181,11 +183,11 @@ function PlaygroundPanel(props: {
   models: ModelListData | null;
   modelsError: string | null;
   pending: boolean;
-  playgroundResult: ChatCompletionResponse | ResponseCreateResult | EmbeddingsCreateResult | null;
+  playgroundResult: ChatCompletionResponse | ResponseCreateResult | EmbeddingsCreateResult | ModerationsCreateResult | null;
   chatError: string | null;
   onReloadModels: () => Promise<void>;
   onSend: (input: {
-    mode: 'chat' | 'responses' | 'embeddings';
+    mode: 'chat' | 'responses' | 'embeddings' | 'moderations';
     model: string;
     prompt: string;
     systemPrompt: string;
@@ -207,12 +209,19 @@ function PlaygroundPanel(props: {
   const [model, setModel] = useState('');
   const [prompt, setPrompt] = useState('用一句话说明你是一个 Cloudflare 上运行的最小 AI 网关。');
   const [systemPrompt, setSystemPrompt] = useState('你是一个简洁的系统说明助手。');
-  const [mode, setMode] = useState<'chat' | 'responses' | 'embeddings'>('responses');
+  const [mode, setMode] = useState<'chat' | 'responses' | 'embeddings' | 'moderations'>('responses');
   const [useApiToken, setUseApiToken] = useState(false);
   const [relayToken, setRelayToken] = useState('');
 
-  const usesSystemPrompt = mode !== 'embeddings';
-  const endpointLabel = mode === 'responses' ? '/v1/responses' : mode === 'chat' ? '/v1/chat/completions' : '/v1/embeddings';
+  const usesSystemPrompt = mode === 'chat' || mode === 'responses';
+  const endpointLabel =
+    mode === 'responses'
+      ? '/v1/responses'
+      : mode === 'chat'
+        ? '/v1/chat/completions'
+        : mode === 'embeddings'
+          ? '/v1/embeddings'
+          : '/v1/moderations';
 
   useEffect(() => {
     if (!model && models && models.data.length > 0) {
@@ -277,6 +286,14 @@ function PlaygroundPanel(props: {
           >
             /v1/embeddings
           </button>
+          <button
+            className={`chip ${mode === 'moderations' ? 'chip-active' : ''}`}
+            disabled={pending}
+            onClick={() => setMode('moderations')}
+            type="button"
+          >
+            /v1/moderations
+          </button>
         </div>
         {modelsError ? <p className="error-text">{modelsError}</p> : null}
         {!playgroundEnabled ? <p className="error-text">当前 D1 设置已关闭 playground。</p> : null}
@@ -316,7 +333,7 @@ function PlaygroundPanel(props: {
             </>
           ) : null}
           <label className="label" htmlFor="user-prompt">
-            {mode === 'embeddings' ? 'Embedding Input' : 'User Prompt'}
+            {mode === 'embeddings' ? 'Embedding Input' : mode === 'moderations' ? 'Moderation Input' : 'User Prompt'}
           </label>
           <textarea
             id="user-prompt"
@@ -812,7 +829,7 @@ export function App() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [chatResult, setChatResult] = useState<ChatCompletionResponse | ResponseCreateResult | EmbeddingsCreateResult | null>(null);
+  const [chatResult, setChatResult] = useState<ChatCompletionResponse | ResponseCreateResult | EmbeddingsCreateResult | ModerationsCreateResult | null>(null);
   const [pending, setPending] = useState(false);
   const [storedAdminJwt, setStoredAdminJwt] = useState('');
 
@@ -973,7 +990,7 @@ export function App() {
   }
 
   async function handleSend(input: {
-    mode: 'chat' | 'responses' | 'embeddings';
+    mode: 'chat' | 'responses' | 'embeddings' | 'moderations';
     model: string;
     prompt: string;
     systemPrompt: string;
@@ -986,7 +1003,9 @@ export function App() {
         ? await sendResponseCreate(input)
         : input.mode === 'embeddings'
           ? await sendEmbeddingsCreate(input)
-          : await sendChatCompletion(input);
+          : input.mode === 'moderations'
+            ? await sendModerationsCreate(input)
+            : await sendChatCompletion(input);
       setChatResult(result);
       await refreshAdminUsage();
     } catch (cause) {

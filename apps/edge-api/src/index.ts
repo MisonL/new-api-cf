@@ -5,6 +5,7 @@ import { createAdminRouter } from './routes/admin';
 import { createChatRouter } from './routes/chat';
 import { createEmbeddingsRouter } from './routes/embeddings';
 import { createModelRouter } from './routes/models';
+import { createModerationsRouter } from './routes/moderations';
 import { createResponsesRouter } from './routes/responses';
 import { createRootRouter } from './routes/root';
 import { createStatusRouter } from './routes/status';
@@ -28,6 +29,7 @@ app.route('/', createAdminRouter());
 app.route('/', createModelRouter());
 app.route('/', createChatRouter());
 app.route('/', createEmbeddingsRouter());
+app.route('/', createModerationsRouter());
 app.route('/', createResponsesRouter());
 
 app.onError((cause, c) => {

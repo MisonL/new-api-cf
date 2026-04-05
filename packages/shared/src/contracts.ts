@@ -102,6 +102,11 @@ export interface EmbeddingsCreateRequestShape {
   user?: string;
 }
 
+export interface ModerationsCreateRequestShape {
+  model: string;
+  input: string | string[];
+}
+
 export type StateStoreKind = 'env' | 'd1';
 
 export interface ControlSettingValues {
