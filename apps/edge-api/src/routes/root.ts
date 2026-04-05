@@ -30,6 +30,7 @@ export function createRootRouter() {
         '/v1/fine_tuning/jobs/:jobId',
         '/v1/fine_tuning/jobs/:jobId/cancel',
         '/v1/fine_tuning/jobs/:jobId/events',
+        '/v1/fine_tuning/jobs/:jobId/checkpoints',
         '/v1/models',
         '/v1/vector_stores',
         '/v1/vector_stores/:vectorStoreId',

@@ -70,5 +70,12 @@ export function createFineTuningRouter() {
     return forwardOpenAiUtilityRequest(`/fine_tuning/jobs/${encodeURIComponent(c.req.param('jobId'))}/events${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
   });
 
+  router.get('/v1/fine_tuning/jobs/:jobId/checkpoints', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/fine_tuning/jobs/${encodeURIComponent(c.req.param('jobId'))}/checkpoints${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
+  });
+
   return router;
 }
