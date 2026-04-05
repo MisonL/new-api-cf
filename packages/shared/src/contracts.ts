@@ -125,6 +125,14 @@ export interface ImageGenerationRequestShape {
   response_format?: 'url' | 'b64_json';
 }
 
+export interface SpeechCreateRequestShape {
+  model: string;
+  input: string;
+  voice: string;
+  response_format?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm';
+  speed?: number;
+}
+
 export type StateStoreKind = 'env' | 'd1';
 
 export interface ControlSettingValues {

@@ -21,6 +21,7 @@ export function createRootRouter() {
         '/api/me',
         '/api/models',
         '/v1/models',
+        '/v1/audio/speech',
         '/v1/chat/completions',
         '/v1/completions',
         '/v1/embeddings',

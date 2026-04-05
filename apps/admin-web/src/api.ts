@@ -185,6 +185,12 @@ export type ImageGenerationResult = {
   }>;
 };
 
+export type SpeechCreateResult = {
+  audioUrl: string;
+  contentType: string;
+  bytes: number;
+};
+
 const EDGE_API_BASE_URL = import.meta.env.VITE_EDGE_API_BASE_URL ?? '';
 const ADMIN_JWT_STORAGE_KEY = 'new-api-cf.admin-jwt';
 
@@ -248,6 +254,38 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return payload.data;
+}
+
+async function requestBinary(path: string, init?: RequestInit): Promise<SpeechCreateResult> {
+  const headers = new Headers(init?.headers);
+  if (init?.body) {
+    headers.set('content-type', 'application/json');
+  }
+  if (!headers.has('authorization')) {
+    const adminJwt = readStoredAdminJwt();
+    if (adminJwt) {
+      headers.set('authorization', `Bearer ${adminJwt}`);
+    }
+  }
+
+  const response = await fetch(`${EDGE_API_BASE_URL}${path}`, {
+    credentials: 'include',
+    ...init,
+    headers
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as ApiEnvelope<unknown> | null;
+    const message = payload && !payload.success ? payload.error.message : 'request failed';
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  return {
+    audioUrl: URL.createObjectURL(blob),
+    contentType: response.headers.get('content-type') || blob.type || 'audio/mpeg',
+    bytes: blob.size
+  };
 }
 
 export function fetchStatus() {
@@ -415,6 +453,28 @@ export function sendImageGeneration(input: {
     body: JSON.stringify({
       model: input.model,
       prompt: input.prompt.trim()
+    })
+  });
+}
+
+export function sendSpeechCreate(input: {
+  model: string;
+  prompt: string;
+  voice: string;
+  bearerToken?: string;
+}) {
+  const headers = new Headers();
+  if (input.bearerToken && input.bearerToken.trim().length > 0) {
+    headers.set('authorization', `Bearer ${input.bearerToken.trim()}`);
+  }
+
+  return requestBinary('/v1/audio/speech', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: input.model,
+      input: input.prompt.trim(),
+      voice: input.voice.trim() || 'alloy'
     })
   });
 }

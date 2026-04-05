@@ -6,6 +6,7 @@ import type {
   ModelDescriptor,
   ModerationsCreateRequestShape,
   ResponseCreateRequestShape,
+  SpeechCreateRequestShape,
   StateStoreKind
 } from '../../../../packages/shared/src/contracts';
 import { getUpstreamProfileById, profileSupportsModel, type RuntimeConfig } from './config';
@@ -137,6 +138,15 @@ export async function forwardImageGeneration(
   access: RelayAccessContext
 ): Promise<Response> {
   return forwardOpenAiRequest(env, '/images/generations', request.model, request, config, access);
+}
+
+export async function forwardSpeechCreate(
+  env: Env,
+  request: SpeechCreateRequestShape,
+  config: RuntimeConfig,
+  access: RelayAccessContext
+): Promise<Response> {
+  return forwardOpenAiRequest(env, '/audio/speech', request.model, request, config, access);
 }
 
 async function forwardOpenAiRequest(

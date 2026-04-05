@@ -13,6 +13,7 @@ import {
   login,
   logout,
   saveAdminSettings,
+  sendSpeechCreate,
   sendChatCompletion,
   sendCompletionCreate,
   sendEmbeddingsCreate,
@@ -34,14 +35,30 @@ import {
   type ModerationsCreateResult,
   type ResponseCreateResult,
   type SessionData,
+  type SpeechCreateResult,
   type StatusData,
   type UsageOverview
 } from './api';
 
+type PlaygroundMode = 'chat' | 'responses' | 'completions' | 'embeddings' | 'images' | 'speech' | 'moderations';
+
+type PlaygroundResult =
+  | ChatCompletionResponse
+  | CompletionCreateResult
+  | ResponseCreateResult
+  | EmbeddingsCreateResult
+  | ImageGenerationResult
+  | SpeechCreateResult
+  | ModerationsCreateResult;
+
+function isSpeechCreateResult(value: PlaygroundResult | null): value is SpeechCreateResult {
+  return Boolean(value && typeof value === 'object' && 'audioUrl' in value);
+}
+
 const capabilityCards = [
   {
     title: 'OpenAI-Compatible Relay',
-    body: '当前主链已经提供 /v1/models、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/generations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
+    body: '当前主链已经提供 /v1/models、/v1/audio/speech、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/generations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
   },
   {
     title: 'Session Login',
@@ -187,14 +204,15 @@ function PlaygroundPanel(props: {
   models: ModelListData | null;
   modelsError: string | null;
   pending: boolean;
-  playgroundResult: ChatCompletionResponse | CompletionCreateResult | ResponseCreateResult | EmbeddingsCreateResult | ImageGenerationResult | ModerationsCreateResult | null;
+  playgroundResult: PlaygroundResult | null;
   chatError: string | null;
   onReloadModels: () => Promise<void>;
   onSend: (input: {
-    mode: 'chat' | 'responses' | 'completions' | 'embeddings' | 'images' | 'moderations';
+    mode: PlaygroundMode;
     model: string;
     prompt: string;
     systemPrompt: string;
+    voice: string;
     bearerToken?: string;
   }) => Promise<void>;
 }) {
@@ -213,7 +231,8 @@ function PlaygroundPanel(props: {
   const [model, setModel] = useState('');
   const [prompt, setPrompt] = useState('用一句话说明你是一个 Cloudflare 上运行的最小 AI 网关。');
   const [systemPrompt, setSystemPrompt] = useState('你是一个简洁的系统说明助手。');
-  const [mode, setMode] = useState<'chat' | 'responses' | 'completions' | 'embeddings' | 'images' | 'moderations'>('responses');
+  const [mode, setMode] = useState<PlaygroundMode>('responses');
+  const [voice, setVoice] = useState('alloy');
   const [useApiToken, setUseApiToken] = useState(false);
   const [relayToken, setRelayToken] = useState('');
 
@@ -223,6 +242,8 @@ function PlaygroundPanel(props: {
       ? '/v1/responses'
       : mode === 'chat'
         ? '/v1/chat/completions'
+        : mode === 'speech'
+          ? '/v1/audio/speech'
         : mode === 'completions'
           ? '/v1/completions'
         : mode === 'embeddings'
@@ -244,6 +265,7 @@ function PlaygroundPanel(props: {
       model,
       prompt,
       systemPrompt,
+      voice,
       bearerToken: useApiToken ? relayToken : undefined
     });
   }
@@ -285,6 +307,14 @@ function PlaygroundPanel(props: {
             type="button"
           >
             /v1/chat/completions
+          </button>
+          <button
+            className={`chip ${mode === 'speech' ? 'chip-active' : ''}`}
+            disabled={pending}
+            onClick={() => setMode('speech')}
+            type="button"
+          >
+            /v1/audio/speech
           </button>
           <button
             className={`chip ${mode === 'completions' ? 'chip-active' : ''}`}
@@ -356,9 +386,31 @@ function PlaygroundPanel(props: {
               />
             </>
           ) : null}
+          {mode === 'speech' ? (
+            <>
+              <label className="label" htmlFor="speech-voice">
+                Speech Voice
+              </label>
+              <select
+                id="speech-voice"
+                className="input"
+                disabled={pending}
+                onChange={(event) => setVoice(event.target.value)}
+                value={voice}
+              >
+                {['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'].map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : null}
           <label className="label" htmlFor="user-prompt">
             {mode === 'embeddings'
               ? 'Embedding Input'
+              : mode === 'speech'
+                ? 'Speech Input'
               : mode === 'images'
                 ? 'Image Prompt'
                 : mode === 'moderations'
@@ -403,6 +455,14 @@ function PlaygroundPanel(props: {
           </button>
         </form>
         {chatError ? <p className="error-text">{chatError}</p> : null}
+        {isSpeechCreateResult(playgroundResult) ? (
+          <div className="stack">
+            <audio controls src={playgroundResult.audioUrl} />
+            <p className="meta-text">
+              {playgroundResult.contentType} / {playgroundResult.bytes} bytes
+            </p>
+          </div>
+        ) : null}
         <pre className="status-block status-block-soft">
           {JSON.stringify(playgroundResult ?? { message: '尚未发送请求' }, null, 2)}
         </pre>
@@ -861,7 +921,7 @@ export function App() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [chatResult, setChatResult] = useState<ChatCompletionResponse | CompletionCreateResult | ResponseCreateResult | EmbeddingsCreateResult | ModerationsCreateResult | null>(null);
+  const [chatResult, setChatResult] = useState<PlaygroundResult | null>(null);
   const [pending, setPending] = useState(false);
   const [storedAdminJwt, setStoredAdminJwt] = useState('');
 
@@ -1022,10 +1082,11 @@ export function App() {
   }
 
   async function handleSend(input: {
-    mode: 'chat' | 'responses' | 'completions' | 'embeddings' | 'images' | 'moderations';
+    mode: PlaygroundMode;
     model: string;
     prompt: string;
     systemPrompt: string;
+    voice: string;
     bearerToken?: string;
   }) {
     setPending(true);
@@ -1037,6 +1098,8 @@ export function App() {
           ? await sendCompletionCreate(input)
         : input.mode === 'embeddings'
           ? await sendEmbeddingsCreate(input)
+          : input.mode === 'speech'
+            ? await sendSpeechCreate(input)
           : input.mode === 'images'
             ? await sendImageGeneration(input)
           : input.mode === 'moderations'
@@ -1145,6 +1208,14 @@ export function App() {
   }
 
   useEffect(() => {
+    return () => {
+      if (isSpeechCreateResult(chatResult)) {
+        URL.revokeObjectURL(chatResult.audioUrl);
+      }
+    };
+  }, [chatResult]);
+
+  useEffect(() => {
     let cancelled = false;
 
     void (async () => {
@@ -1197,7 +1268,7 @@ export function App() {
         <p className="eyebrow">Cloudflare Worker-first Skeleton</p>
         <h1>new-api-cf</h1>
         <p className="lede">
-          面向 10 人以内并发场景的 Cloudflare Free 版统一 AI 网关，当前已具备登录、模型读取和最小 chat playground。
+          面向 10 人以内并发场景的 Cloudflare Free 版统一 AI 网关，当前已具备登录、模型读取和多入口 playground。
         </p>
       </section>
 
