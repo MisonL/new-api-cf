@@ -57,7 +57,9 @@ export function createRootRouter() {
         '/v1/uploads',
         '/v1/uploads/:uploadId/parts',
         '/v1/uploads/:uploadId/complete',
-        '/v1/uploads/:uploadId/cancel'
+        '/v1/uploads/:uploadId/cancel',
+        '/v1/realtime/client_secrets',
+        '/v1/realtime/calls'
       ]
     });
   });

@@ -203,6 +203,64 @@ export async function forwardOpenAiUtilityRequest(
   });
 }
 
+export async function forwardOpenAiModelUtilityRequest(
+  env: Env,
+  upstreamPath: string,
+  model: string,
+  init: RequestInit,
+  config: RuntimeConfig
+): Promise<Response> {
+  ensureUpstreamReady(config);
+  const catalog = await resolveModelCatalog(env, config);
+  assertModelAllowed(model, catalog.models, catalog.stateStore);
+  const profile = resolveUpstreamProfile(config, catalog.models, model);
+  const baseUrl = normalizeBaseUrl(profile.baseUrl);
+  const headers = new Headers(init.headers);
+  headers.set('authorization', `Bearer ${profile.apiKey}`);
+
+  const abortController = new AbortController();
+  const timeoutHandle = setTimeout(() => abortController.abort(), config.upstreamTimeoutMs);
+
+  try {
+    const response = await fetch(`${baseUrl}${upstreamPath}`, {
+      ...init,
+      headers,
+      signal: abortController.signal
+    });
+
+    const responseHeaders = new Headers();
+    const contentType = response.headers.get('content-type');
+    if (contentType) {
+      responseHeaders.set('content-type', contentType);
+    }
+    const upstreamRequestId = response.headers.get('x-request-id');
+    if (upstreamRequestId) {
+      responseHeaders.set('x-upstream-request-id', upstreamRequestId);
+    }
+
+    return new Response(response.body, {
+      status: response.status,
+      headers: responseHeaders
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError(504, 'UPSTREAM_TIMEOUT', 'upstream request timed out', {
+        model,
+        upstreamPath,
+        timeoutMs: config.upstreamTimeoutMs
+      });
+    }
+
+    throw new ApiError(502, 'UPSTREAM_FETCH_FAILED', 'failed to reach upstream provider', {
+      model,
+      upstreamPath,
+      reason: error instanceof Error ? error.message : String(error)
+    });
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
 export async function forwardSpeechCreate(
   env: Env,
   request: SpeechCreateRequestShape,

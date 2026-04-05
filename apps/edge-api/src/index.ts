@@ -12,6 +12,7 @@ import { createFineTuningRouter } from './routes/fine-tuning';
 import { createImagesRouter } from './routes/images';
 import { createModelRouter } from './routes/models';
 import { createModerationsRouter } from './routes/moderations';
+import { createRealtimeRouter } from './routes/realtime';
 import { createResponsesRouter } from './routes/responses';
 import { createRootRouter } from './routes/root';
 import { createStatusRouter } from './routes/status';
@@ -46,6 +47,7 @@ app.route('/', createEmbeddingsRouter());
 app.route('/', createImagesRouter());
 app.route('/', createModerationsRouter());
 app.route('/', createResponsesRouter());
+app.route('/', createRealtimeRouter());
 app.route('/', createUploadsRouter());
 
 app.onError((cause, c) => {
