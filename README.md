@@ -34,6 +34,11 @@
   - `DELETE /api/admin/tokens/:id`
   - `GET /api/me`
   - `GET /api/models`
+  - `GET /v1/assistants`
+  - `POST /v1/assistants`
+  - `GET /v1/assistants/:assistantId`
+  - `POST /v1/assistants/:assistantId`
+  - `DELETE /v1/assistants/:assistantId`
   - `GET /v1/batches`
   - `POST /v1/batches`
   - `GET /v1/batches/:batchId`
@@ -119,8 +124,9 @@
 说明：
 
 - 当前 relay 只支持 OpenAI-compatible 上游
+- `assistants` 相关接口当前继续透传 `OpenAI-Beta: assistants=v2`，因为上游官方文档仍要求该头；同时这组接口在官方文档里已标注 deprecated
 - 当前已支持“多 upstream profile 定义在 Worker env，模型到 profile 映射落在 D1”
-- 若未配置上游环境变量，`/api/models`、`/v1/batches`、`/v1/files`、`/v1/fine_tuning/jobs`、`/v1/vector_stores`、`/v1/audio/speech`、`/v1/audio/transcriptions`、`/v1/audio/translations`、`/v1/chat/completions`、`/v1/completions`、`/v1/conversations`、`/v1/embeddings`、`/v1/images/edits`、`/v1/images/generations`、`/v1/images/variations`、`/v1/moderations`、`/v1/responses`、`/v1/uploads`、`/v1/realtime/client_secrets`、`/v1/realtime/calls` 和 `/v1/realtime/transcription_sessions` 会显式失败
+- 若未配置上游环境变量，`/api/models`、`/v1/assistants`、`/v1/batches`、`/v1/files`、`/v1/fine_tuning/jobs`、`/v1/vector_stores`、`/v1/audio/speech`、`/v1/audio/transcriptions`、`/v1/audio/translations`、`/v1/chat/completions`、`/v1/completions`、`/v1/conversations`、`/v1/embeddings`、`/v1/images/edits`、`/v1/images/generations`、`/v1/images/variations`、`/v1/moderations`、`/v1/responses`、`/v1/uploads`、`/v1/realtime/client_secrets`、`/v1/realtime/calls` 和 `/v1/realtime/transcription_sessions` 会显式失败
 - 若使用 `AUTH_MODE=session`，可通过 admin token 登录换取 HMAC 签名 cookie
 - 若前端与 Worker 分域部署，需显式配置 `CORS_ORIGIN`
 - Worker 会为每个请求生成 `x-request-id`
@@ -140,7 +146,7 @@
   - 未绑定 Queue 时，继续走当前同步 D1 兜底
   - 这样可以把 usage 聚合逐步从主链移出，而不改变当前接口行为
 - 若绑定 `RELAY_LIMITER` Durable Object 且配置 `RELAY_RATE_LIMIT_PER_MINUTE`：
-  - `/v1/batches`、`/v1/files`、`/v1/fine_tuning/jobs`、`/v1/vector_stores`、`/v1/audio/speech`、`/v1/audio/transcriptions`、`/v1/audio/translations`、`/v1/chat/completions`、`/v1/completions`、`/v1/conversations`、`/v1/embeddings`、`/v1/images/edits`、`/v1/images/generations`、`/v1/images/variations`、`/v1/moderations`、`/v1/responses`、`/v1/uploads`、`/v1/realtime/client_secrets`、`/v1/realtime/calls` 与 `/v1/realtime/transcription_sessions` 会按调用方执行每分钟速率门禁
+  - `/v1/assistants`、`/v1/batches`、`/v1/files`、`/v1/fine_tuning/jobs`、`/v1/vector_stores`、`/v1/audio/speech`、`/v1/audio/transcriptions`、`/v1/audio/translations`、`/v1/chat/completions`、`/v1/completions`、`/v1/conversations`、`/v1/embeddings`、`/v1/images/edits`、`/v1/images/generations`、`/v1/images/variations`、`/v1/moderations`、`/v1/responses`、`/v1/uploads`、`/v1/realtime/client_secrets`、`/v1/realtime/calls` 与 `/v1/realtime/transcription_sessions` 会按调用方执行每分钟速率门禁
   - 当前调用方粒度为 `admin-session` 或 `api-token`
   - 配置了速率上限但未绑定 DO 时会显式失败，不做静默绕过
 - `/api/admin/usage` 提供近 1 到 30 天的 D1 usage 日聚合视图：
@@ -148,7 +154,7 @@
   - 当前只记录请求数、成功数、失败数和最近状态码
   - 不写逐请求明细，优先控制 Free 额度写放大
 - 当 Worker 已绑定 D1 且目录为空时，`/api/models` 会显式返回 `MODEL_CATALOG_EMPTY`
-- `/v1/batches`、`/v1/files`、`/v1/fine_tuning/jobs`、`/v1/vector_stores`、`/v1/models`、`/v1/audio/speech`、`/v1/audio/transcriptions`、`/v1/audio/translations`、`/v1/chat/completions`、`/v1/completions`、`/v1/conversations`、`/v1/embeddings`、`/v1/images/edits`、`/v1/images/generations`、`/v1/images/variations`、`/v1/moderations`、`/v1/responses`、`/v1/uploads`、`/v1/realtime/client_secrets`、`/v1/realtime/calls` 与 `/v1/realtime/transcription_sessions` 当前要求：
+- `/v1/assistants`、`/v1/batches`、`/v1/files`、`/v1/fine_tuning/jobs`、`/v1/vector_stores`、`/v1/models`、`/v1/audio/speech`、`/v1/audio/transcriptions`、`/v1/audio/translations`、`/v1/chat/completions`、`/v1/completions`、`/v1/conversations`、`/v1/embeddings`、`/v1/images/edits`、`/v1/images/generations`、`/v1/images/variations`、`/v1/moderations`、`/v1/responses`、`/v1/uploads`、`/v1/realtime/client_secrets`、`/v1/realtime/calls` 与 `/v1/realtime/transcription_sessions` 当前要求：
   - admin session
   - 或 D1 API token
 - `files`、`batches`、`fine_tuning/jobs`、`vector_stores`、`uploads` 和 `conversations` 相关接口当前固定走默认 upstream profile，不参与模型目录校验；`realtime/client_secrets`、`realtime/calls` 与 `realtime/transcription_sessions` 会按请求体中的模型字段走模型目录与 upstream profile 映射

@@ -20,6 +20,8 @@ export function createRootRouter() {
         '/api/admin/usage',
         '/api/me',
         '/api/models',
+        '/v1/assistants',
+        '/v1/assistants/:assistantId',
         '/v1/batches',
         '/v1/batches/:batchId',
         '/v1/batches/:batchId/cancel',
