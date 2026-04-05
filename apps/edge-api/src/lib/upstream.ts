@@ -153,6 +153,16 @@ export async function forwardImageEdit(
   return forwardOpenAiRequest(env, '/images/edits', model, request, config, access, undefined);
 }
 
+export async function forwardImageVariation(
+  env: Env,
+  model: string,
+  request: FormData,
+  config: RuntimeConfig,
+  access: RelayAccessContext
+): Promise<Response> {
+  return forwardOpenAiRequest(env, '/images/variations', model, request, config, access, undefined);
+}
+
 export async function forwardSpeechCreate(
   env: Env,
   request: SpeechCreateRequestShape,

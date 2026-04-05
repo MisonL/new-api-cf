@@ -29,6 +29,7 @@ export function createRootRouter() {
         '/v1/embeddings',
         '/v1/images/edits',
         '/v1/images/generations',
+        '/v1/images/variations',
         '/v1/moderations',
         '/v1/responses'
       ]

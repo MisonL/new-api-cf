@@ -14,6 +14,7 @@ import {
   logout,
   saveAdminSettings,
   sendImageEdit,
+  sendImageVariation,
   sendSpeechCreate,
   sendTranscriptionCreate,
   sendTranslationCreate,
@@ -52,6 +53,7 @@ type PlaygroundMode =
   | 'embeddings'
   | 'images'
   | 'image-edits'
+  | 'image-variations'
   | 'speech'
   | 'transcriptions'
   | 'translations'
@@ -75,7 +77,7 @@ function isSpeechCreateResult(value: PlaygroundResult | null): value is SpeechCr
 const capabilityCards = [
   {
     title: 'OpenAI-Compatible Relay',
-    body: '当前主链已经提供 /v1/models、/v1/audio/speech、/v1/audio/transcriptions、/v1/audio/translations、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/edits、/v1/images/generations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
+    body: '当前主链已经提供 /v1/models、/v1/audio/speech、/v1/audio/transcriptions、/v1/audio/translations、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/edits、/v1/images/generations、/v1/images/variations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
   },
   {
     title: 'Session Login',
@@ -275,6 +277,8 @@ function PlaygroundPanel(props: {
           ? '/v1/embeddings'
           : mode === 'image-edits'
             ? '/v1/images/edits'
+          : mode === 'image-variations'
+            ? '/v1/images/variations'
           : mode === 'images'
             ? '/v1/images/generations'
           : '/v1/moderations';
@@ -386,6 +390,14 @@ function PlaygroundPanel(props: {
             /v1/images/edits
           </button>
           <button
+            className={`chip ${mode === 'image-variations' ? 'chip-active' : ''}`}
+            disabled={pending}
+            onClick={() => setMode('image-variations')}
+            type="button"
+          >
+            /v1/images/variations
+          </button>
+          <button
             className={`chip ${mode === 'images' ? 'chip-active' : ''}`}
             disabled={pending}
             onClick={() => setMode('images')}
@@ -459,20 +471,20 @@ function PlaygroundPanel(props: {
               </select>
             </>
           ) : null}
-          {mode === 'transcriptions' || mode === 'translations' || mode === 'image-edits' ? (
+          {mode === 'transcriptions' || mode === 'translations' || mode === 'image-edits' || mode === 'image-variations' ? (
             <>
               <label className="label" htmlFor="audio-file">
-                {mode === 'image-edits' ? 'Image File' : 'Audio File'}
+                {mode === 'image-edits' || mode === 'image-variations' ? 'Image File' : 'Audio File'}
               </label>
               <input
                 id="audio-file"
                 className="input"
                 disabled={pending}
-                accept={mode === 'image-edits' ? 'image/*' : undefined}
+                accept={mode === 'image-edits' || mode === 'image-variations' ? 'image/*' : undefined}
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
                 type="file"
               />
-              {mode === 'image-edits' ? null : (
+              {mode === 'image-edits' || mode === 'image-variations' ? null : (
                 <>
               <label className="label" htmlFor="transcription-language">
                 Language
@@ -500,6 +512,8 @@ function PlaygroundPanel(props: {
                     ? 'Translation Prompt'
                     : mode === 'image-edits'
                       ? 'Edit Prompt'
+                      : mode === 'image-variations'
+                        ? 'Variation Prompt'
                 : mode === 'images'
                   ? 'Image Prompt'
                 : mode === 'moderations'
@@ -513,7 +527,7 @@ function PlaygroundPanel(props: {
             className="input textarea"
             disabled={pending}
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder={mode === 'transcriptions' || mode === 'translations' ? '可选：补充上下文提示词' : undefined}
+            placeholder={mode === 'transcriptions' || mode === 'translations' ? '可选：补充上下文提示词' : mode === 'image-variations' ? '无需填写，可留空' : undefined}
             value={prompt}
           />
           <label className="checkbox-row">
@@ -542,7 +556,7 @@ function PlaygroundPanel(props: {
           ) : null}
           <button
             className="action"
-            disabled={pending || !playgroundEnabled || !model || ((mode === 'transcriptions' || mode === 'translations' || mode === 'image-edits') ? !file || prompt.trim().length === 0 : prompt.trim().length === 0)}
+            disabled={pending || !playgroundEnabled || !model || ((mode === 'transcriptions' || mode === 'translations' || mode === 'image-edits') ? !file || prompt.trim().length === 0 : mode === 'image-variations' ? !file : prompt.trim().length === 0)}
             type="submit"
           >
             {pending ? '请求中...' : `发送到 ${endpointLabel}`}
@@ -1225,6 +1239,15 @@ export function App() {
         result = await sendImageEdit({
           model: input.model,
           prompt: input.prompt,
+          file: input.file,
+          bearerToken: input.bearerToken
+        });
+      } else if (input.mode === 'image-variations') {
+        if (!input.file) {
+          throw new Error('image variation file is required');
+        }
+        result = await sendImageVariation({
+          model: input.model,
           file: input.file,
           bearerToken: input.bearerToken
         });

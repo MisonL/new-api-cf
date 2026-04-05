@@ -38,3 +38,21 @@ export function parseImageEditRequest(formData: FormData): ImageEditRequestInput
     response_format: formData.get('response_format') || undefined
   });
 }
+
+export const imageVariationRequestSchema = z.object({
+  model: z.string().min(1),
+  image: imageFileSchema,
+  size: z.string().min(1).optional(),
+  response_format: z.enum(['url', 'b64_json']).optional()
+});
+
+export type ImageVariationRequestInput = z.infer<typeof imageVariationRequestSchema>;
+
+export function parseImageVariationRequest(formData: FormData): ImageVariationRequestInput {
+  return imageVariationRequestSchema.parse({
+    model: formData.get('model'),
+    image: formData.get('image'),
+    size: formData.get('size') || undefined,
+    response_format: formData.get('response_format') || undefined
+  });
+}
