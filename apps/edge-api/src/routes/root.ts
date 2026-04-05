@@ -35,6 +35,7 @@ export function createRootRouter() {
         '/v1/vector_stores/:vectorStoreId',
         '/v1/vector_stores/:vectorStoreId/files',
         '/v1/vector_stores/:vectorStoreId/files/:fileId',
+        '/v1/vector_stores/:vectorStoreId/files/:fileId/content',
         '/v1/vector_stores/:vectorStoreId/file_batches',
         '/v1/vector_stores/:vectorStoreId/file_batches/:batchId',
         '/v1/vector_stores/:vectorStoreId/file_batches/:batchId/cancel',

@@ -122,6 +122,13 @@ export function createVectorStoresRouter() {
     return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/files/${encodeURIComponent(c.req.param('fileId'))}`, { method: 'GET' }, config);
   });
 
+  router.get('/v1/vector_stores/:vectorStoreId/files/:fileId/content', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/vector_stores/${encodeURIComponent(c.req.param('vectorStoreId'))}/files/${encodeURIComponent(c.req.param('fileId'))}/content${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
+  });
+
   router.delete('/v1/vector_stores/:vectorStoreId/files/:fileId', async (c) => {
     const config = getRuntimeConfig(c.env);
     const access = await requireRelayAccess(c, config);

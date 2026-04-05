@@ -57,6 +57,7 @@
   - `GET /v1/vector_stores/:vectorStoreId/files`
   - `POST /v1/vector_stores/:vectorStoreId/files`
   - `GET /v1/vector_stores/:vectorStoreId/files/:fileId`
+  - `GET /v1/vector_stores/:vectorStoreId/files/:fileId/content`
   - `DELETE /v1/vector_stores/:vectorStoreId/files/:fileId`
   - `GET /v1/vector_stores/:vectorStoreId/file_batches`
   - `POST /v1/vector_stores/:vectorStoreId/file_batches`
