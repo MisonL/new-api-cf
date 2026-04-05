@@ -53,7 +53,11 @@ export function createRootRouter() {
         '/v1/responses',
         '/v1/responses/:responseId',
         '/v1/responses/:responseId/cancel',
-        '/v1/responses/:responseId/input_items'
+        '/v1/responses/:responseId/input_items',
+        '/v1/uploads',
+        '/v1/uploads/:uploadId/parts',
+        '/v1/uploads/:uploadId/complete',
+        '/v1/uploads/:uploadId/cancel'
       ]
     });
   });

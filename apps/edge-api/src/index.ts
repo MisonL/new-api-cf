@@ -15,6 +15,7 @@ import { createModerationsRouter } from './routes/moderations';
 import { createResponsesRouter } from './routes/responses';
 import { createRootRouter } from './routes/root';
 import { createStatusRouter } from './routes/status';
+import { createUploadsRouter } from './routes/uploads';
 import { createVectorStoresRouter } from './routes/vector-stores';
 import { corsMiddleware } from './lib/cors';
 import { requestIdMiddleware } from './lib/request-id';
@@ -45,6 +46,7 @@ app.route('/', createEmbeddingsRouter());
 app.route('/', createImagesRouter());
 app.route('/', createModerationsRouter());
 app.route('/', createResponsesRouter());
+app.route('/', createUploadsRouter());
 
 app.onError((cause, c) => {
   if (cause instanceof ApiError) {
