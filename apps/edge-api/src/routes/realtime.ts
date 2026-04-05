@@ -14,6 +14,12 @@ const createRealtimeClientSecretRequestSchema = z.object({
   session: realtimeSessionSchema
 }).passthrough();
 
+const realtimeTranscriptionSessionSchema = z.object({
+  input_audio_transcription: z.object({
+    model: z.string().min(1)
+  }).passthrough()
+}).passthrough();
+
 export function createRealtimeRouter() {
   const router = new Hono<{ Bindings: Env }>();
 
@@ -62,6 +68,29 @@ export function createRealtimeRouter() {
       method: 'POST',
       body: upstreamFormData
     }, config);
+  });
+
+  router.post('/v1/realtime/transcription_sessions', async (c) => {
+    const payload = await c.req.json().catch(() => {
+      throw new ApiError(400, 'INVALID_JSON', 'request body must be valid JSON');
+    });
+    const request = realtimeTranscriptionSessionSchema.parse(payload);
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiModelUtilityRequest(
+      c.env,
+      '/realtime/transcription_sessions',
+      request.input_audio_transcription.model,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify(request)
+      },
+      config
+    );
   });
 
   return router;
