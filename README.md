@@ -130,6 +130,7 @@ bun run --cwd apps/edge-api d1:migrate:local
 - 当前 playground 支持切换调用：
   - `/v1/responses`
   - `/v1/chat/completions`
+  - `/v1/embeddings`
 
 本地 D1 初始化流程：
 
