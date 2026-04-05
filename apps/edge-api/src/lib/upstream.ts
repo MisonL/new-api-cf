@@ -1,5 +1,6 @@
 import type {
   ChatCompletionRequestShape,
+  CompletionCreateRequestShape,
   EmbeddingsCreateRequestShape,
   ModelDescriptor,
   ModerationsCreateRequestShape,
@@ -117,6 +118,15 @@ export async function forwardModerationsCreate(
   access: RelayAccessContext
 ): Promise<Response> {
   return forwardOpenAiRequest(env, '/moderations', request.model, request, config, access);
+}
+
+export async function forwardCompletionCreate(
+  env: Env,
+  request: CompletionCreateRequestShape,
+  config: RuntimeConfig,
+  access: RelayAccessContext
+): Promise<Response> {
+  return forwardOpenAiRequest(env, '/completions', request.model, request, config, access);
 }
 
 async function forwardOpenAiRequest(

@@ -142,6 +142,18 @@ export type ChatCompletionResponse = {
   }>;
 };
 
+export type CompletionCreateResult = {
+  id: string;
+  object: 'text_completion';
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    text: string;
+    finish_reason?: string | null;
+  }>;
+};
+
 export type ResponseCreateResult = Record<string, unknown>;
 
 export type EmbeddingsCreateResult = {
@@ -292,6 +304,26 @@ export function sendChatCompletion(input: {
     body: JSON.stringify({
       model: input.model,
       messages
+    })
+  });
+}
+
+export function sendCompletionCreate(input: {
+  model: string;
+  prompt: string;
+  bearerToken?: string;
+}) {
+  const headers = new Headers();
+  if (input.bearerToken && input.bearerToken.trim().length > 0) {
+    headers.set('authorization', `Bearer ${input.bearerToken.trim()}`);
+  }
+
+  return request<CompletionCreateResult>('/v1/completions', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: input.model,
+      prompt: input.prompt.trim()
     })
   });
 }

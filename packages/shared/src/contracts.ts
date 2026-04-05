@@ -107,6 +107,15 @@ export interface ModerationsCreateRequestShape {
   input: string | string[];
 }
 
+export interface CompletionCreateRequestShape {
+  model: string;
+  prompt: string | string[];
+  max_tokens?: number;
+  temperature?: number;
+  top_p?: number;
+  stream?: boolean;
+}
+
 export type StateStoreKind = 'env' | 'd1';
 
 export interface ControlSettingValues {
