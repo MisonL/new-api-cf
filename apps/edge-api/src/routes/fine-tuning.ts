@@ -18,6 +18,8 @@ const createFineTuningJobRequestSchema = z.object({
   metadata: z.record(z.string(), z.string()).optional()
 });
 
+const createCheckpointPermissionRequestSchema = z.object({}).passthrough();
+
 function buildQueryString(url: URL) {
   return url.search ? url.search : '';
 }
@@ -75,6 +77,37 @@ export function createFineTuningRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     return forwardOpenAiUtilityRequest(`/fine_tuning/jobs/${encodeURIComponent(c.req.param('jobId'))}/checkpoints${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
+  });
+
+  router.get('/v1/fine_tuning/checkpoints/:checkpointId/permissions', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/fine_tuning/checkpoints/${encodeURIComponent(c.req.param('checkpointId'))}/permissions${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
+  });
+
+  router.post('/v1/fine_tuning/checkpoints/:checkpointId/permissions', async (c) => {
+    const payload = await c.req.json().catch(() => {
+      throw new ApiError(400, 'INVALID_JSON', 'request body must be valid JSON');
+    });
+    const request = createCheckpointPermissionRequestSchema.parse(payload);
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/fine_tuning/checkpoints/${encodeURIComponent(c.req.param('checkpointId'))}/permissions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }, config);
+  });
+
+  router.delete('/v1/fine_tuning/checkpoints/:checkpointId/permissions/:permissionId', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/fine_tuning/checkpoints/${encodeURIComponent(c.req.param('checkpointId'))}/permissions/${encodeURIComponent(c.req.param('permissionId'))}`, { method: 'DELETE' }, config);
   });
 
   return router;

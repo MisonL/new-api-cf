@@ -49,6 +49,9 @@
   - `POST /v1/fine_tuning/jobs/:jobId/cancel`
   - `GET /v1/fine_tuning/jobs/:jobId/events`
   - `GET /v1/fine_tuning/jobs/:jobId/checkpoints`
+  - `GET /v1/fine_tuning/checkpoints/:checkpointId/permissions`
+  - `POST /v1/fine_tuning/checkpoints/:checkpointId/permissions`
+  - `DELETE /v1/fine_tuning/checkpoints/:checkpointId/permissions/:permissionId`
   - `GET /v1/models`
   - `GET /v1/vector_stores`
   - `POST /v1/vector_stores`

@@ -31,6 +31,8 @@ export function createRootRouter() {
         '/v1/fine_tuning/jobs/:jobId/cancel',
         '/v1/fine_tuning/jobs/:jobId/events',
         '/v1/fine_tuning/jobs/:jobId/checkpoints',
+        '/v1/fine_tuning/checkpoints/:checkpointId/permissions',
+        '/v1/fine_tuning/checkpoints/:checkpointId/permissions/:permissionId',
         '/v1/models',
         '/v1/vector_stores',
         '/v1/vector_stores/:vectorStoreId',
