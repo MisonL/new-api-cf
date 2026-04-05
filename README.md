@@ -76,6 +76,7 @@
   - `POST /v1/moderations`
   - `POST /v1/responses`
   - `POST /v1/responses/input_tokens`
+  - `POST /v1/responses/compact`
   - `GET /v1/responses/:responseId`
   - `DELETE /v1/responses/:responseId`
   - `POST /v1/responses/:responseId/cancel`

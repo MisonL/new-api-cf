@@ -53,6 +53,7 @@ export function createRootRouter() {
         '/v1/moderations',
         '/v1/responses',
         '/v1/responses/input_tokens',
+        '/v1/responses/compact',
         '/v1/responses/:responseId',
         '/v1/responses/:responseId/cancel',
         '/v1/responses/:responseId/input_items',

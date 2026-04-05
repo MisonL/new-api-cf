@@ -11,6 +11,10 @@ const responseInputTokensRequestSchema = z.object({
   model: z.string().min(1).optional()
 }).passthrough();
 
+const responseCompactRequestSchema = z.object({
+  model: z.string().min(1)
+}).passthrough();
+
 function buildQueryString(url: URL) {
   return url.search ? url.search : '';
 }
@@ -49,6 +53,23 @@ export function createResponsesRouter() {
     }
 
     return forwardOpenAiUtilityRequest('/responses/input_tokens', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }, config);
+  });
+
+  router.post('/v1/responses/compact', async (c) => {
+    const payload = await c.req.json().catch(() => {
+      throw new ApiError(400, 'INVALID_JSON', 'request body must be valid JSON');
+    });
+    const request = responseCompactRequestSchema.parse(payload);
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiModelUtilityRequest(c.env, '/responses/compact', request.model, {
       method: 'POST',
       headers: {
         'content-type': 'application/json'
