@@ -89,6 +89,15 @@ function resolveUpstreamProfile(config: RuntimeConfig, modelCatalog: ModelDescri
   return profile;
 }
 
+function resolveDefaultUpstreamProfile(config: RuntimeConfig) {
+  ensureUpstreamReady(config);
+  const profile = getUpstreamProfileById(config, config.defaultUpstreamProfileId);
+  if (!profile) {
+    throw new ApiError(503, 'UPSTREAM_PROFILE_NOT_FOUND', 'default upstream profile is not available');
+  }
+  return profile;
+}
+
 export async function forwardChatCompletion(
   env: Env,
   request: ChatCompletionRequestShape,
@@ -161,6 +170,37 @@ export async function forwardImageVariation(
   access: RelayAccessContext
 ): Promise<Response> {
   return forwardOpenAiRequest(env, '/images/variations', model, request, config, access, undefined);
+}
+
+export async function forwardOpenAiUtilityRequest(
+  upstreamPath: string,
+  init: RequestInit,
+  config: RuntimeConfig
+): Promise<Response> {
+  const profile = resolveDefaultUpstreamProfile(config);
+  const baseUrl = normalizeBaseUrl(profile.baseUrl);
+  const headers = new Headers(init.headers);
+  headers.set('authorization', `Bearer ${profile.apiKey}`);
+
+  const response = await fetch(`${baseUrl}${upstreamPath}`, {
+    ...init,
+    headers
+  });
+
+  const responseHeaders = new Headers();
+  const contentType = response.headers.get('content-type');
+  if (contentType) {
+    responseHeaders.set('content-type', contentType);
+  }
+  const upstreamRequestId = response.headers.get('x-request-id');
+  if (upstreamRequestId) {
+    responseHeaders.set('x-upstream-request-id', upstreamRequestId);
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    headers: responseHeaders
+  });
 }
 
 export async function forwardSpeechCreate(
