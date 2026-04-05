@@ -19,6 +19,10 @@ const completeUploadRequestSchema = z.object({
   md5: z.string().min(1).optional()
 }).passthrough();
 
+function buildQueryString(url: URL) {
+  return url.search ? url.search : '';
+}
+
 export function createUploadsRouter() {
   const router = new Hono<{ Bindings: Env }>();
 
@@ -36,6 +40,33 @@ export function createUploadsRouter() {
         'content-type': 'application/json'
       },
       body: JSON.stringify(request)
+    }, config);
+  });
+
+  router.get('/v1/uploads/:uploadId', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/uploads/${encodeURIComponent(c.req.param('uploadId'))}`, {
+      method: 'GET'
+    }, config);
+  });
+
+  router.get('/v1/uploads/:uploadId/parts', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/uploads/${encodeURIComponent(c.req.param('uploadId'))}/parts${buildQueryString(new URL(c.req.url))}`, {
+      method: 'GET'
+    }, config);
+  });
+
+  router.get('/v1/uploads/:uploadId/parts/:partId', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/uploads/${encodeURIComponent(c.req.param('uploadId'))}/parts/${encodeURIComponent(c.req.param('partId'))}`, {
+      method: 'GET'
     }, config);
   });
 

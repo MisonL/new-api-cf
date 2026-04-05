@@ -81,6 +81,9 @@
   - `POST /v1/responses/:responseId/cancel`
   - `GET /v1/responses/:responseId/input_items`
   - `POST /v1/uploads`
+  - `GET /v1/uploads/:uploadId`
+  - `GET /v1/uploads/:uploadId/parts`
+  - `GET /v1/uploads/:uploadId/parts/:partId`
   - `POST /v1/uploads/:uploadId/parts`
   - `POST /v1/uploads/:uploadId/complete`
   - `POST /v1/uploads/:uploadId/cancel`
