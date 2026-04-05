@@ -176,6 +176,15 @@ export type ModerationsCreateResult = {
   results: Array<Record<string, unknown>>;
 };
 
+export type ImageGenerationResult = {
+  created?: number;
+  data: Array<{
+    url?: string;
+    b64_json?: string;
+    revised_prompt?: string;
+  }>;
+};
+
 const EDGE_API_BASE_URL = import.meta.env.VITE_EDGE_API_BASE_URL ?? '';
 const ADMIN_JWT_STORAGE_KEY = 'new-api-cf.admin-jwt';
 
@@ -386,6 +395,26 @@ export function sendModerationsCreate(input: {
     body: JSON.stringify({
       model: input.model,
       input: input.prompt.trim()
+    })
+  });
+}
+
+export function sendImageGeneration(input: {
+  model: string;
+  prompt: string;
+  bearerToken?: string;
+}) {
+  const headers = new Headers();
+  if (input.bearerToken && input.bearerToken.trim().length > 0) {
+    headers.set('authorization', `Bearer ${input.bearerToken.trim()}`);
+  }
+
+  return request<ImageGenerationResult>('/v1/images/generations', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: input.model,
+      prompt: input.prompt.trim()
     })
   });
 }

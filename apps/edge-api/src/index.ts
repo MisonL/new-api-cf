@@ -5,6 +5,7 @@ import { createAdminRouter } from './routes/admin';
 import { createChatRouter } from './routes/chat';
 import { createCompletionsRouter } from './routes/completions';
 import { createEmbeddingsRouter } from './routes/embeddings';
+import { createImagesRouter } from './routes/images';
 import { createModelRouter } from './routes/models';
 import { createModerationsRouter } from './routes/moderations';
 import { createResponsesRouter } from './routes/responses';
@@ -31,6 +32,7 @@ app.route('/', createModelRouter());
 app.route('/', createChatRouter());
 app.route('/', createCompletionsRouter());
 app.route('/', createEmbeddingsRouter());
+app.route('/', createImagesRouter());
 app.route('/', createModerationsRouter());
 app.route('/', createResponsesRouter());
 

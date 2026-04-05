@@ -24,6 +24,7 @@ export function createRootRouter() {
         '/v1/chat/completions',
         '/v1/completions',
         '/v1/embeddings',
+        '/v1/images/generations',
         '/v1/moderations',
         '/v1/responses'
       ]

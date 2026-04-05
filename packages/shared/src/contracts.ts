@@ -116,6 +116,15 @@ export interface CompletionCreateRequestShape {
   stream?: boolean;
 }
 
+export interface ImageGenerationRequestShape {
+  model: string;
+  prompt: string;
+  size?: string;
+  quality?: string;
+  style?: string;
+  response_format?: 'url' | 'b64_json';
+}
+
 export type StateStoreKind = 'env' | 'd1';
 
 export interface ControlSettingValues {

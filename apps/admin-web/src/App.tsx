@@ -16,6 +16,7 @@ import {
   sendChatCompletion,
   sendCompletionCreate,
   sendEmbeddingsCreate,
+  sendImageGeneration,
   sendModerationsCreate,
   sendResponseCreate,
   clearStoredAdminJwt,
@@ -28,6 +29,7 @@ import {
   type ChatCompletionResponse,
   type CompletionCreateResult,
   type EmbeddingsCreateResult,
+  type ImageGenerationResult,
   type ModelListData,
   type ModerationsCreateResult,
   type ResponseCreateResult,
@@ -39,7 +41,7 @@ import {
 const capabilityCards = [
   {
     title: 'OpenAI-Compatible Relay',
-    body: '当前主链已经提供 /v1/models、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
+    body: '当前主链已经提供 /v1/models、/v1/chat/completions、/v1/completions、/v1/embeddings、/v1/images/generations、/v1/moderations 与 /v1/responses，未配置上游时会显式失败。'
   },
   {
     title: 'Session Login',
@@ -185,11 +187,11 @@ function PlaygroundPanel(props: {
   models: ModelListData | null;
   modelsError: string | null;
   pending: boolean;
-  playgroundResult: ChatCompletionResponse | CompletionCreateResult | ResponseCreateResult | EmbeddingsCreateResult | ModerationsCreateResult | null;
+  playgroundResult: ChatCompletionResponse | CompletionCreateResult | ResponseCreateResult | EmbeddingsCreateResult | ImageGenerationResult | ModerationsCreateResult | null;
   chatError: string | null;
   onReloadModels: () => Promise<void>;
   onSend: (input: {
-    mode: 'chat' | 'responses' | 'completions' | 'embeddings' | 'moderations';
+    mode: 'chat' | 'responses' | 'completions' | 'embeddings' | 'images' | 'moderations';
     model: string;
     prompt: string;
     systemPrompt: string;
@@ -211,7 +213,7 @@ function PlaygroundPanel(props: {
   const [model, setModel] = useState('');
   const [prompt, setPrompt] = useState('用一句话说明你是一个 Cloudflare 上运行的最小 AI 网关。');
   const [systemPrompt, setSystemPrompt] = useState('你是一个简洁的系统说明助手。');
-  const [mode, setMode] = useState<'chat' | 'responses' | 'completions' | 'embeddings' | 'moderations'>('responses');
+  const [mode, setMode] = useState<'chat' | 'responses' | 'completions' | 'embeddings' | 'images' | 'moderations'>('responses');
   const [useApiToken, setUseApiToken] = useState(false);
   const [relayToken, setRelayToken] = useState('');
 
@@ -225,6 +227,8 @@ function PlaygroundPanel(props: {
           ? '/v1/completions'
         : mode === 'embeddings'
           ? '/v1/embeddings'
+          : mode === 'images'
+            ? '/v1/images/generations'
           : '/v1/moderations';
 
   useEffect(() => {
@@ -299,6 +303,14 @@ function PlaygroundPanel(props: {
             /v1/embeddings
           </button>
           <button
+            className={`chip ${mode === 'images' ? 'chip-active' : ''}`}
+            disabled={pending}
+            onClick={() => setMode('images')}
+            type="button"
+          >
+            /v1/images/generations
+          </button>
+          <button
             className={`chip ${mode === 'moderations' ? 'chip-active' : ''}`}
             disabled={pending}
             onClick={() => setMode('moderations')}
@@ -345,7 +357,15 @@ function PlaygroundPanel(props: {
             </>
           ) : null}
           <label className="label" htmlFor="user-prompt">
-            {mode === 'embeddings' ? 'Embedding Input' : mode === 'moderations' ? 'Moderation Input' : mode === 'completions' ? 'Completion Prompt' : 'User Prompt'}
+            {mode === 'embeddings'
+              ? 'Embedding Input'
+              : mode === 'images'
+                ? 'Image Prompt'
+                : mode === 'moderations'
+                  ? 'Moderation Input'
+                  : mode === 'completions'
+                    ? 'Completion Prompt'
+                    : 'User Prompt'}
           </label>
           <textarea
             id="user-prompt"
@@ -1002,7 +1022,7 @@ export function App() {
   }
 
   async function handleSend(input: {
-    mode: 'chat' | 'responses' | 'completions' | 'embeddings' | 'moderations';
+    mode: 'chat' | 'responses' | 'completions' | 'embeddings' | 'images' | 'moderations';
     model: string;
     prompt: string;
     systemPrompt: string;
@@ -1017,6 +1037,8 @@ export function App() {
           ? await sendCompletionCreate(input)
         : input.mode === 'embeddings'
           ? await sendEmbeddingsCreate(input)
+          : input.mode === 'images'
+            ? await sendImageGeneration(input)
           : input.mode === 'moderations'
             ? await sendModerationsCreate(input)
             : await sendChatCompletion(input);
