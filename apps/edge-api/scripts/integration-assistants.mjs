@@ -158,6 +158,14 @@ try {
   const bootstrap = await requestJson('/api/admin/bootstrap', { method: 'POST' });
   assert(bootstrap.response.ok, 'control plane bootstrap should succeed');
 
+  const listAssistants = await requestJson('/v1/assistants?limit=1&order=desc');
+  assert(listAssistants.response.ok, 'assistant list should succeed');
+  assert(Array.isArray(listAssistants.json.data), 'assistant list should return list data');
+  assert(countHits(primary, (hit) => hit.path === '/assistants' && hit.method === 'GET' && hit.search === '?limit=1&order=desc' && hit.openaiBeta === 'assistants=v2') === 1, 'assistant list should hit default profile with beta header and query string');
+
+  primary.clear();
+  secondary.clear();
+
   const createdAssistant = await requestJson('/v1/assistants', {
     method: 'POST',
     body: JSON.stringify({ model: 'secondary-model', name: 'secondary assistant' })
@@ -174,6 +182,22 @@ try {
   assert(readAssistant.response.ok, 'stored assistant should be retrievable');
   assert(countHits(primary, (hit) => hit.path === '/assistants/asst_secondary') === 0, 'stored assistant should not probe primary');
   assert(countHits(secondary, (hit) => hit.path === '/assistants/asst_secondary') === 1, 'stored assistant should read from secondary');
+
+  primary.clear();
+  secondary.clear();
+
+  const updatedAssistant = await requestJson('/v1/assistants/asst_secondary', {
+    method: 'POST',
+    body: JSON.stringify({
+      metadata: {
+        stage: 'updated'
+      }
+    })
+  });
+  assert(updatedAssistant.response.ok, 'stored assistant update should succeed');
+  assert(updatedAssistant.json.metadata.stage === 'updated', 'assistant update should preserve JSON payload');
+  assert(countHits(primary, (hit) => hit.path === '/assistants/asst_secondary' && hit.method === 'POST') === 0, 'stored assistant update should not hit primary');
+  assert(countHits(secondary, (hit) => hit.path === '/assistants/asst_secondary' && hit.method === 'POST' && hit.body?.metadata?.stage === 'updated' && hit.openaiBeta === 'assistants=v2') === 1, 'stored assistant update should hit secondary with beta header');
 
   primary.clear();
   secondary.clear();
@@ -234,10 +258,29 @@ try {
   assert(countHits(primary, (hit) => hit.path === '/threads/thread_primary/runs') === 0, 'mismatch should fail before reaching primary upstream');
   assert(countHits(secondary, (hit) => hit.path === '/threads/thread_primary/runs') === 0, 'mismatch should fail before reaching secondary upstream');
 
+  primary.clear();
+  secondary.clear();
+
+  const deleteAssistant = await requestJson('/v1/assistants/asst_secondary', { method: 'DELETE' });
+  assert(deleteAssistant.response.ok, 'stored assistant delete should succeed');
+  assert(deleteAssistant.json.deleted === true, 'assistant delete should return deleted flag');
+  assert(countHits(primary, (hit) => hit.path === '/assistants/asst_secondary' && hit.method === 'DELETE') === 0, 'stored assistant delete should not hit primary');
+  assert(countHits(secondary, (hit) => hit.path === '/assistants/asst_secondary' && hit.method === 'DELETE' && hit.openaiBeta === 'assistants=v2') === 1, 'stored assistant delete should hit secondary with beta header');
+
+  primary.clear();
+  secondary.clear();
+
+  const deletedAssistantRead = await requestJson('/v1/assistants/asst_secondary');
+  assert(deletedAssistantRead.response.ok, 'assistant should still be readable if upstream object still exists');
+  assert(countHits(primary, (hit) => hit.path === '/assistants/asst_secondary' && hit.method === 'GET') === 1, 'assistant read after delete should probe primary once after registry removal');
+  assert(countHits(secondary, (hit) => hit.path === '/assistants/asst_secondary' && hit.method === 'GET') === 2, 'assistant read after delete should rediscover and reread secondary after registry removal');
+
   console.log(JSON.stringify({
     ok: true,
     verified: [
+      'assistant utility routes preserve beta header and query string',
       'assistant affinity persistence',
+      'assistant update and delete follow stored profile registry',
       'legacy assistant upstream discovery cache',
       'thread affinity persistence after threads/runs',
       'thread/assistant profile mismatch gate'

@@ -40,6 +40,14 @@ export function createMockServer(profileId, port) {
       return createResponse(res, 200, { id, object: 'assistant', model: body?.model || 'unknown' });
     }
 
+    if (req.method === 'GET' && url.pathname === '/assistants') {
+      const id = profileId === 'secondary' ? 'asst_secondary' : 'asst_primary';
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id, object: 'assistant', model: `${profileId}-model` }]
+      });
+    }
+
     if (req.method === 'GET' && url.pathname.startsWith('/models/')) {
       const model = url.pathname.split('/').pop();
       return createResponse(res, 200, {
@@ -56,6 +64,31 @@ export function createMockServer(profileId, port) {
       }
       if (assistantId === 'asst_legacy' && profileId === 'secondary') {
         return createResponse(res, 200, { id: assistantId, object: 'assistant', model: 'secondary-model' });
+      }
+      return createResponse(res, 404, { error: { message: 'not found' } });
+    }
+
+    if (req.method === 'POST' && url.pathname.startsWith('/assistants/')) {
+      const assistantId = url.pathname.split('/').pop();
+      if (assistantId === 'asst_secondary' && profileId === 'secondary') {
+        return createResponse(res, 200, {
+          id: assistantId,
+          object: 'assistant',
+          model: body?.model || 'secondary-model',
+          metadata: body?.metadata || {}
+        });
+      }
+      return createResponse(res, 404, { error: { message: 'not found' } });
+    }
+
+    if (req.method === 'DELETE' && url.pathname.startsWith('/assistants/')) {
+      const assistantId = url.pathname.split('/').pop();
+      if ((assistantId === 'asst_secondary' || assistantId === 'asst_legacy') && profileId === 'secondary') {
+        return createResponse(res, 200, {
+          id: assistantId,
+          object: 'assistant.deleted',
+          deleted: true
+        });
       }
       return createResponse(res, 404, { error: { message: 'not found' } });
     }

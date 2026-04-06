@@ -251,6 +251,7 @@ bun run integration:all
 - 旧的 `OPENAI_*` 单 profile 环境变量仍可继续作为兼容入口
 - `bun run integration:fine-tuning` 会启动本地 mock upstream 与本地 worker，验证 `jobs/create/detail/cancel/pause/resume/events/checkpoints/permissions` 这组 fine-tuning utility 端点固定转发到默认 upstream profile，且 query string 与 JSON 请求体保持透传
 - `bun run integration:control-plane` 会启动本地 worker，验证 `status/auth/admin/models/token` 这组控制面接口在 session 模式下的登录、bootstrap、模型启停、usage 参数校验和 token 生命周期
+- `bun run integration:assistants` 会启动本地 mock upstream 与本地 worker，验证 `assistants` 的 list/create/detail/update/delete 以及 `threads/runs` 关联助手的路由归属、beta header、query string 和 legacy 自动探测缓存
 - `bun run integration:vector-stores` 会启动本地 mock upstream 与本地 worker，验证 `vector_stores` 的 list/detail/update/delete、files、file_batches、search 这组工具接口固定走默认 upstream profile，请求保持 `OpenAI-Beta: assistants=v2`，且 query string、JSON 请求体与原始文件内容透传正常
 - `bun run integration:uploads` 会启动本地 mock upstream 与本地 worker，验证 `uploads` 的 create/detail/parts/list/complete/cancel 这组工具接口固定走默认 upstream profile，且 query string、JSON 请求体与 multipart 分片内容透传正常
 - `bun run integration:files` 会启动本地 mock upstream 与本地 worker，验证 `files` 的 list/detail/create/delete/content 这组工具接口固定走默认 upstream profile，且 query string、上游载荷与原始内容下载保持透传
