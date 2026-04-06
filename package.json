@@ -19,6 +19,7 @@
     "integration:realtime": "bun run --cwd apps/edge-api integration:realtime",
     "integration:responses": "bun run --cwd apps/edge-api integration:responses",
     "integration:fine-tuning": "bun run --cwd apps/edge-api integration:fine-tuning",
-    "integration:vector-stores": "bun run --cwd apps/edge-api integration:vector-stores"
+    "integration:vector-stores": "bun run --cwd apps/edge-api integration:vector-stores",
+    "integration:uploads": "bun run --cwd apps/edge-api integration:uploads"
   }
 }

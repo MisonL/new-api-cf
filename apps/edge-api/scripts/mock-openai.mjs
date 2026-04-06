@@ -28,6 +28,8 @@ export function createMockServer(profileId, port) {
       method: req.method || 'GET',
       path: url.pathname,
       body,
+      rawBody,
+      contentType: String(contentType),
       openaiBeta: req.headers['openai-beta'] || '',
       authorization: req.headers.authorization || ''
     });
@@ -285,6 +287,54 @@ export function createMockServer(profileId, port) {
       return createResponse(res, 200, {
         id: `vsbatch_${profileId}`,
         object: 'vector_store.file_batch',
+        status: 'cancelled'
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/uploads') {
+      return createResponse(res, 200, {
+        id: `upload_${profileId}`,
+        object: 'upload',
+        status: 'pending'
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/uploads/upload_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `upload_${profileId}`,
+        object: 'upload',
+        status: 'pending'
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/uploads/upload_${profileId}/parts`) {
+      return createResponse(res, 200, {
+        id: `part_${profileId}`,
+        object: 'upload.part',
+        upload_id: `upload_${profileId}`
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/uploads/upload_${profileId}/parts/part_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `part_${profileId}`,
+        object: 'upload.part',
+        upload_id: `upload_${profileId}`
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/uploads/upload_${profileId}/complete`) {
+      return createResponse(res, 200, {
+        id: `upload_${profileId}`,
+        object: 'upload',
+        status: 'completed'
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/uploads/upload_cancel_${profileId}/cancel`) {
+      return createResponse(res, 200, {
+        id: `upload_cancel_${profileId}`,
+        object: 'upload',
         status: 'cancelled'
       });
     }
