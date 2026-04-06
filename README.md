@@ -251,6 +251,7 @@ bun run integration:all
 - 旧的 `OPENAI_*` 单 profile 环境变量仍可继续作为兼容入口
 - `bun run integration:fine-tuning` 会启动本地 mock upstream 与本地 worker，验证 `jobs/create/detail/cancel/pause/resume/events/checkpoints/permissions` 这组 fine-tuning utility 端点固定转发到默认 upstream profile，且 query string 与 JSON 请求体保持透传
 - `bun run integration:control-plane` 会启动本地 worker，验证 `status/auth/admin/models/token` 这组控制面接口在 session 模式下的登录、bootstrap、模型启停、usage 参数校验和 token 生命周期
+- `bun run integration:state-plane` 会启动一个带 Queue / Durable Object 绑定的本地 worker，验证状态面能力已经真实接线：`status` 暴露绑定状态、usage 经 Queue 聚合回 D1、Relay 速率门禁经 Durable Object 生效
 - `bun run integration:assistants` 会启动本地 mock upstream 与本地 worker，验证 `assistants` 的 list/create/detail/update/delete 以及 `threads/runs` 关联助手的路由归属、beta header、query string 和 legacy 自动探测缓存
 - `bun run integration:responses` 会启动本地 mock upstream 与本地 worker，验证 `responses` 的 create/input_tokens/compact/detail/delete/cancel/input_items 路由在 registry、模型选路和 legacy 自动探测下的转发行为
 - `bun run integration:conversations` 会启动本地 mock upstream 与本地 worker，验证 `conversations` 的 create/detail/update/delete/items 路由固定走默认 upstream profile，且 item list/detail 的 query string 与 JSON 请求体透传正常
@@ -377,6 +378,16 @@ core relay 联调：
 - `images/generations`、`images/edits`、`images/variations` 会按 `model` 路由到正确 upstream
 - 脚本执行完成后会自动清理临时状态目录和本地进程
 
+state plane 联调：
+
+- 运行 `bun run integration:state-plane`
+- 脚本会自动启动一个本地 mock upstream 和一个启用了 Queue / Durable Object 的本地 Worker
+- 自动验证以下行为：
+  - `GET /api/status` 会正确暴露 `queueConfigured`、`durableObjectConfigured` 与 `relayRateLimitPerMinute`
+  - relay 首次成功请求的 usage 会通过 `USAGE_EVENTS` Queue 异步聚合回 D1
+  - 第二次同 actor 请求会被 `RELAY_LIMITER` Durable Object 按分钟限流，并在到达 upstream 前返回 `429 RATE_LIMITED`
+- 脚本执行完成后会自动清理临时状态目录和本地进程
+
 conversations 工具链联调：
 
 - 运行 `bun run integration:conversations`
@@ -394,6 +405,7 @@ conversations 工具链联调：
   - `assistants`
   - `threads-runs`
   - `control-plane`
+  - `state-plane`
   - `fine-tuning`
   - `realtime`
   - `responses`
