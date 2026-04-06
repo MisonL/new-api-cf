@@ -5,6 +5,18 @@ function createResponse(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function createSseResponse(res, chunks) {
+  res.writeHead(200, {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-cache',
+    connection: 'keep-alive'
+  });
+  for (const chunk of chunks) {
+    res.write(chunk);
+  }
+  res.end();
+}
+
 function collectBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -311,6 +323,14 @@ export function createMockServer(profileId, port) {
     }
 
     if (req.method === 'POST' && url.pathname === '/responses') {
+      if (body?.stream === true) {
+        createSseResponse(res, [
+          `data: ${JSON.stringify({ type: 'response.created', response: { id: `resp_${profileId}`, model: body?.model || 'unknown' } })}\n\n`,
+          `data: ${JSON.stringify({ type: 'response.output_text.delta', delta: `response-${profileId}` })}\n\n`,
+          'data: [DONE]\n\n'
+        ]);
+        return;
+      }
       if (body?.previous_response_id === 'resp_secondary' && profileId === 'secondary') {
         return createResponse(res, 200, {
           id: 'resp_secondary_followup',
@@ -794,6 +814,14 @@ export function createMockServer(profileId, port) {
     }
 
     if (req.method === 'POST' && url.pathname === '/chat/completions') {
+      if (body?.stream === true) {
+        createSseResponse(res, [
+          `data: ${JSON.stringify({ id: `chatcmpl_${profileId}`, object: 'chat.completion.chunk', model: body?.model || 'unknown', choices: [{ index: 0, delta: { role: 'assistant', content: `chat-${profileId}` }, finish_reason: null }] })}\n\n`,
+          `data: ${JSON.stringify({ id: `chatcmpl_${profileId}`, object: 'chat.completion.chunk', model: body?.model || 'unknown', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`,
+          'data: [DONE]\n\n'
+        ]);
+        return;
+      }
       return createResponse(res, 200, {
         id: `chatcmpl_${profileId}`,
         object: 'chat.completion',
@@ -813,6 +841,14 @@ export function createMockServer(profileId, port) {
     }
 
     if (req.method === 'POST' && url.pathname === '/completions') {
+      if (body?.stream === true) {
+        createSseResponse(res, [
+          `data: ${JSON.stringify({ id: `cmpl_${profileId}`, object: 'text_completion', model: body?.model || 'unknown', choices: [{ index: 0, text: `completion-${profileId}`, finish_reason: null }] })}\n\n`,
+          `data: ${JSON.stringify({ id: `cmpl_${profileId}`, object: 'text_completion', model: body?.model || 'unknown', choices: [{ index: 0, text: '', finish_reason: 'stop' }] })}\n\n`,
+          'data: [DONE]\n\n'
+        ]);
+        return;
+      }
       return createResponse(res, 200, {
         id: `cmpl_${profileId}`,
         object: 'text_completion',

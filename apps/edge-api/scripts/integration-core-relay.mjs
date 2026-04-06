@@ -112,6 +112,24 @@ try {
   primary.clear();
   secondary.clear();
 
+  const chatStream = await request('/v1/chat/completions', {
+    method: 'POST',
+    body: JSON.stringify({
+      model: 'secondary-model',
+      stream: true,
+      messages: [{ role: 'user', content: 'stream hello' }]
+    })
+  });
+  assert(chatStream.response.ok, 'streaming chat completion should succeed');
+  assert((chatStream.response.headers.get('content-type') || '').includes('text/event-stream'), 'streaming chat completion should preserve sse content type');
+  assert(chatStream.text.includes('data: {"id":"chatcmpl_secondary"'), 'streaming chat completion should preserve sse chunk payload');
+  assert(chatStream.text.includes('data: [DONE]'), 'streaming chat completion should preserve sse terminator');
+  assert(countHits(primary, (hit) => hit.path === '/chat/completions') === 0, 'streaming chat completion should not hit primary');
+  assert(countHits(secondary, (hit) => hit.path === '/chat/completions' && hit.body?.stream === true) === 1, 'streaming chat completion should hit secondary with stream flag');
+
+  primary.clear();
+  secondary.clear();
+
   const completion = await request('/v1/completions', {
     method: 'POST',
     body: JSON.stringify({
@@ -122,6 +140,42 @@ try {
   assert(completion.response.ok, 'completion should succeed');
   assert(completion.json.choices[0].text === 'completion-secondary', 'completion should route to secondary upstream');
   assert(countHits(secondary, (hit) => hit.path === '/completions') === 1, 'completion should hit secondary');
+
+  primary.clear();
+  secondary.clear();
+
+  const completionStream = await request('/v1/completions', {
+    method: 'POST',
+    body: JSON.stringify({
+      model: 'secondary-model',
+      stream: true,
+      prompt: 'stream hello'
+    })
+  });
+  assert(completionStream.response.ok, 'streaming completion should succeed');
+  assert((completionStream.response.headers.get('content-type') || '').includes('text/event-stream'), 'streaming completion should preserve sse content type');
+  assert(completionStream.text.includes('data: {"id":"cmpl_secondary"'), 'streaming completion should preserve sse chunk payload');
+  assert(completionStream.text.includes('data: [DONE]'), 'streaming completion should preserve sse terminator');
+  assert(countHits(primary, (hit) => hit.path === '/completions') === 0, 'streaming completion should not hit primary');
+  assert(countHits(secondary, (hit) => hit.path === '/completions' && hit.body?.stream === true) === 1, 'streaming completion should hit secondary with stream flag');
+
+  primary.clear();
+  secondary.clear();
+
+  const responseStream = await request('/v1/responses', {
+    method: 'POST',
+    body: JSON.stringify({
+      model: 'secondary-model',
+      stream: true,
+      input: 'stream hello'
+    })
+  });
+  assert(responseStream.response.ok, 'streaming response create should succeed');
+  assert((responseStream.response.headers.get('content-type') || '').includes('text/event-stream'), 'streaming response create should preserve sse content type');
+  assert(responseStream.text.includes('data: {"type":"response.created"'), 'streaming response create should preserve sse chunk payload');
+  assert(responseStream.text.includes('data: [DONE]'), 'streaming response create should preserve sse terminator');
+  assert(countHits(primary, (hit) => hit.path === '/responses') === 0, 'streaming response create should not hit primary');
+  assert(countHits(secondary, (hit) => hit.path === '/responses' && hit.body?.stream === true) === 1, 'streaming response create should hit secondary with stream flag');
 
   primary.clear();
   secondary.clear();
@@ -244,7 +298,10 @@ try {
     ok: true,
     verified: [
       'chat completions route by model',
+      'chat completions preserve sse passthrough',
       'completions route by model',
+      'completions preserve sse passthrough',
+      'responses preserve sse passthrough',
       'embeddings and moderations route by model',
       'audio speech preserves raw upstream response',
       'audio transcription and translation preserve multipart payloads',
