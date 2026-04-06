@@ -191,6 +191,7 @@ bun install
 bun run types:edge
 bun run check
 bun run --cwd apps/edge-api d1:migrate:local
+bun run integration:assistants
 ```
 
 环境变量：
@@ -245,6 +246,17 @@ bun run --cwd apps/edge-api d1:migrate:local
 3. 登录管理页
 4. 调用 `/api/admin/bootstrap` 初始化 D1 控制面目录
 5. 通过 `/api/admin/tokens` 创建用户侧 relay token
+
+多 upstream assistants/threads/runs 联调：
+
+- 运行 `bun run integration:assistants`
+- 脚本会自动启动两个本地 mock upstream 和一个本地 Worker
+- 自动验证以下行为：
+  - assistant 创建后按 model 绑定到正确 upstream profile
+  - legacy assistant 首次访问时自动探测 upstream，并把归属写回本地 registry
+  - `POST /v1/threads/runs` 返回的新 thread 会继承 assistant 的 upstream profile
+  - `POST /v1/threads/:threadId/runs` 在 thread 与 assistant 分属不同 profile 时显式返回 `THREAD_ASSISTANT_PROFILE_MISMATCH`
+- 脚本执行完成后会自动清理临时状态目录和本地进程
 
 ## 目录结构
 
