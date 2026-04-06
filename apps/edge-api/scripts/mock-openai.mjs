@@ -334,6 +334,25 @@ export function createMockServer(profileId, port) {
       });
     }
 
+    if (req.method === 'POST' && url.pathname === '/responses/input_tokens') {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{
+          token: `token_${profileId}`,
+          expires_at: 1234567890
+        }],
+        model: body?.model || null
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/responses/compact') {
+      return createResponse(res, 200, {
+        object: 'response.compact',
+        model: body?.model || 'unknown',
+        compacted: true
+      });
+    }
+
     if (req.method === 'GET' && url.pathname === `/responses/resp_${profileId}`) {
       return createResponse(res, 200, {
         id: `resp_${profileId}`,

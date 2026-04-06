@@ -148,6 +148,42 @@ try {
   const bootstrap = await request('/api/admin/bootstrap', { method: 'POST' });
   assert(bootstrap.response.ok, 'control plane bootstrap should succeed');
 
+  const inputTokensDefault = await request('/v1/responses/input_tokens', {
+    method: 'POST',
+    body: JSON.stringify({ ttl_seconds: 60 })
+  });
+  assert(inputTokensDefault.response.ok, 'response input_tokens without model should succeed');
+  assert(inputTokensDefault.json.data[0]?.token === 'token_primary', 'response input_tokens without model should use default upstream');
+  assert(countHits(primary, (hit) => hit.path === '/responses/input_tokens' && hit.method === 'POST' && hit.body?.ttl_seconds === 60) === 1, 'response input_tokens without model should preserve JSON payload on default upstream');
+  assert(countHits(secondary, (hit) => hit.path === '/responses/input_tokens') === 0, 'response input_tokens without model should not hit secondary');
+
+  primary.clear();
+  secondary.clear();
+
+  const inputTokensModeled = await request('/v1/responses/input_tokens', {
+    method: 'POST',
+    body: JSON.stringify({ model: 'secondary-model', ttl_seconds: 120 })
+  });
+  assert(inputTokensModeled.response.ok, 'response input_tokens with model should succeed');
+  assert(inputTokensModeled.json.data[0]?.token === 'token_secondary', 'response input_tokens with model should route by model');
+  assert(countHits(primary, (hit) => hit.path === '/responses/input_tokens') === 0, 'response input_tokens with model should not hit primary');
+  assert(countHits(secondary, (hit) => hit.path === '/responses/input_tokens' && hit.method === 'POST' && hit.body?.ttl_seconds === 120 && hit.body?.model === 'secondary-model') === 1, 'response input_tokens with model should preserve JSON payload on resolved upstream');
+
+  primary.clear();
+  secondary.clear();
+
+  const compact = await request('/v1/responses/compact', {
+    method: 'POST',
+    body: JSON.stringify({ model: 'secondary-model', response_id: 'resp_secondary' })
+  });
+  assert(compact.response.ok, 'response compact should succeed');
+  assert(compact.json.compacted === true, 'response compact should preserve upstream payload');
+  assert(countHits(primary, (hit) => hit.path === '/responses/compact') === 0, 'response compact should not hit primary');
+  assert(countHits(secondary, (hit) => hit.path === '/responses/compact' && hit.method === 'POST' && hit.body?.response_id === 'resp_secondary') === 1, 'response compact should preserve JSON payload on resolved upstream');
+
+  primary.clear();
+  secondary.clear();
+
   const created = await request('/v1/responses', {
     method: 'POST',
     body: JSON.stringify({ model: 'secondary-model', input: 'hello' })
@@ -254,6 +290,7 @@ try {
   console.log(JSON.stringify({
     ok: true,
     verified: [
+      'response input_tokens and compact utility routes preserve upstream selection and payloads',
       'response affinity persistence after create',
       'response continuation uses stored profile',
       'response continuation accepts omitted input',
