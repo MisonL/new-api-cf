@@ -61,15 +61,19 @@ async function stopChild(child) {
   if (!child || child.exitCode !== null) {
     return;
   }
-  child.kill('SIGTERM');
+  if (process.platform !== 'win32' && typeof child.pid === 'number') {
+    try {
+      process.kill(-child.pid, 'SIGKILL');
+    } catch {
+      child.kill('SIGKILL');
+    }
+  } else {
+    child.kill('SIGKILL');
+  }
   await Promise.race([
     new Promise((resolve) => child.once('close', resolve)),
     delay(3000)
   ]);
-  if (child.exitCode === null) {
-    child.kill('SIGKILL');
-    await new Promise((resolve) => child.once('close', resolve));
-  }
 }
 
 async function request(pathname, init = {}) {
@@ -137,6 +141,7 @@ try {
   worker = spawn('bunx', ['wrangler', 'dev', '--local', '--port', String(EDGE_PORT), '--persist-to', stateDir, '-c', configPath], {
     cwd: EDGE_DIR,
     env: process.env,
+    detached: process.platform !== 'win32',
     stdio: ['ignore', 'pipe', 'pipe']
   });
   worker.stdout.on('data', (chunk) => process.stdout.write(String(chunk)));
