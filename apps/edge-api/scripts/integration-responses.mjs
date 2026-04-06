@@ -167,6 +167,18 @@ try {
   primary.clear();
   secondary.clear();
 
+  const emptyInputFollowup = await request('/v1/responses', {
+    method: 'POST',
+    body: JSON.stringify({ model: 'secondary-model', previous_response_id: 'resp_secondary' })
+  });
+  assert(emptyInputFollowup.response.ok, 'followup without explicit input should be accepted');
+  assert(emptyInputFollowup.json.id === 'resp_secondary_followup', 'followup without explicit input should stay on secondary');
+  assert(countHits(primary, (hit) => hit.path === '/responses' && hit.method === 'POST') === 0, 'empty-input followup should not hit primary');
+  assert(countHits(secondary, (hit) => hit.path === '/responses' && hit.method === 'POST') === 1, 'empty-input followup should hit secondary');
+
+  primary.clear();
+  secondary.clear();
+
   const mismatch = await request('/v1/responses', {
     method: 'POST',
     body: JSON.stringify({ model: 'primary-model', input: 'mismatch', previous_response_id: 'resp_secondary' })
@@ -239,6 +251,7 @@ try {
     verified: [
       'response affinity persistence after create',
       'response continuation uses stored profile',
+      'response continuation accepts omitted input',
       'response continuation mismatch is rejected before upstream',
       'response input_items route through stored profile',
       'legacy response upstream discovery cache',

@@ -88,7 +88,7 @@ export interface ChatCompletionResponseShape {
 
 export interface ResponseCreateRequestShape {
   model: string;
-  input: unknown;
+  input?: unknown;
   instructions?: string;
   previous_response_id?: string | null;
   stream?: boolean;

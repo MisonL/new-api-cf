@@ -189,6 +189,7 @@
 - `GET /v1/models/:model` 直接基于本地模型目录返回单模型详情，不再额外请求上游
 - `responses` 在创建成功后，会把 `response_id -> upstream_profile_id` 映射写入 D1；后续 `GET/DELETE/cancel/input_items` 会优先按该映射回到正确上游
 - 若 `POST /v1/responses` 带有 `previous_response_id`，Worker 会优先沿用前一条 response 的 upstream 归属；若它和当前 `model` 映射出的 profile 不一致，会显式返回 `RESPONSE_PREVIOUS_PROFILE_MISMATCH`
+- `POST /v1/responses` 当前允许省略 `input`；在 continuation 场景下可仅提供 `model + previous_response_id`
 - `assistants` 在创建或带 `model` 更新后，会把 `assistant_id -> upstream_profile_id` 映射写入 D1；后续 `GET/POST/DELETE /v1/assistants/:assistantId` 会优先按该映射回到正确上游，避免多 profile 场景下打错 provider
 - `threads` 在创建或 `threads/runs` 返回新 thread 后，也会把 `thread_id -> upstream_profile_id` 映射写入 D1；后续 messages 和 runs 相关接口会优先按该映射回到正确上游
 - `runs` 当前按 assistant / thread 映射选择 upstream profile；若 `POST /v1/threads/:threadId/runs` 中 thread 与 assistant 归属的 profile 不一致，会显式返回 `THREAD_ASSISTANT_PROFILE_MISMATCH`
@@ -292,6 +293,7 @@ responses 多 upstream 联调：
 - 自动验证以下行为：
   - `POST /v1/responses` 创建后会持久化 `response_id -> upstream_profile_id`
   - 带 `previous_response_id` 的续写请求会复用上一条 response 的 upstream
+  - continuation 场景下允许省略 `input`
   - 若 `previous_response_id` 与当前 `model` 归属不同 profile，会显式返回 `RESPONSE_PREVIOUS_PROFILE_MISMATCH`
   - `GET /v1/responses/:responseId` 与 `/input_items` 会按已记录 profile 回到正确 upstream
   - 既有 legacy response 首次访问时会自动发现 upstream 并回写 registry
