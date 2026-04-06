@@ -14,7 +14,8 @@
     "integration:responses": "node ./scripts/integration-responses.mjs",
     "integration:fine-tuning": "node ./scripts/integration-fine-tuning.mjs",
     "integration:vector-stores": "node ./scripts/integration-vector-stores.mjs",
-    "integration:uploads": "node ./scripts/integration-uploads.mjs"
+    "integration:uploads": "node ./scripts/integration-uploads.mjs",
+    "integration:files": "node ./scripts/integration-files.mjs"
   },
   "dependencies": {
     "hono": "^4.12.10",

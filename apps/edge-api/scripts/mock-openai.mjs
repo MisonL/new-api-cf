@@ -339,6 +339,43 @@ export function createMockServer(profileId, port) {
       });
     }
 
+    if (req.method === 'POST' && url.pathname === '/files') {
+      return createResponse(res, 200, {
+        id: `file_${profileId}`,
+        object: 'file',
+        purpose: 'assistants'
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === '/files') {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: `file_${profileId}`, object: 'file' }]
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/files/file_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `file_${profileId}`,
+        object: 'file',
+        purpose: 'assistants'
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/files/file_${profileId}/content`) {
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      res.end(`file-content-${profileId}`);
+      return;
+    }
+
+    if (req.method === 'DELETE' && url.pathname === `/files/file_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `file_${profileId}`,
+        object: 'file.deleted',
+        deleted: true
+      });
+    }
+
     return createResponse(res, 404, { error: { message: 'unhandled route', path: url.pathname } });
   });
 
