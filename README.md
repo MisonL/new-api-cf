@@ -146,6 +146,7 @@
   - `control_settings`
   - `relay_models`
   - `api_tokens`
+  - `relay_assistants`
   - `usage_daily`
 - 若绑定 `MODEL_CATALOG_CACHE`，Worker 会把“启用中的模型目录快照”写入 KV：
   - 只在 bootstrap / 模型更新时刷新
@@ -168,6 +169,7 @@
   - admin session
   - 或 D1 API token
 - `files`、`batches`、`fine_tuning/jobs`、`vector_stores`、`uploads` 和 `conversations` 相关接口当前固定走默认 upstream profile，不参与模型目录校验；`realtime/client_secrets`、`realtime/calls` 与 `realtime/transcription_sessions` 会按请求体中的模型字段走模型目录与 upstream profile 映射
+- `assistants` 在创建或带 `model` 更新后，会把 `assistant_id -> upstream_profile_id` 映射写入 D1；后续 `GET/POST/DELETE /v1/assistants/:assistantId` 会优先按该映射回到正确上游，避免多 profile 场景下打错 provider
 - 当前已接入 D1，KV / Durable Objects / Queues 仍未接入
 
 ## 开发命令

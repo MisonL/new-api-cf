@@ -68,6 +68,17 @@ export async function resolveModelCatalog(env: Env, config: RuntimeConfig): Prom
   return getEnabledModels(env, config);
 }
 
+export async function resolveUpstreamProfileIdForModel(
+  env: Env,
+  model: string,
+  config: RuntimeConfig
+): Promise<string> {
+  ensureUpstreamReady(config);
+  const catalog = await resolveModelCatalog(env, config);
+  assertModelAllowed(model, catalog.models, catalog.stateStore);
+  return resolveUpstreamProfile(config, catalog.models, model).id;
+}
+
 function resolveUpstreamProfile(config: RuntimeConfig, modelCatalog: ModelDescriptor[], model: string) {
   const descriptor = modelCatalog.find((item) => item.id === model);
   const profile = getUpstreamProfileById(config, descriptor?.upstreamProfileId);
@@ -178,6 +189,45 @@ export async function forwardOpenAiUtilityRequest(
   config: RuntimeConfig
 ): Promise<Response> {
   const profile = resolveDefaultUpstreamProfile(config);
+  const baseUrl = normalizeBaseUrl(profile.baseUrl);
+  const headers = new Headers(init.headers);
+  headers.set('authorization', `Bearer ${profile.apiKey}`);
+
+  const response = await fetch(`${baseUrl}${upstreamPath}`, {
+    ...init,
+    headers
+  });
+
+  const responseHeaders = new Headers();
+  const contentType = response.headers.get('content-type');
+  if (contentType) {
+    responseHeaders.set('content-type', contentType);
+  }
+  const upstreamRequestId = response.headers.get('x-request-id');
+  if (upstreamRequestId) {
+    responseHeaders.set('x-upstream-request-id', upstreamRequestId);
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    headers: responseHeaders
+  });
+}
+
+export async function forwardOpenAiProfileUtilityRequest(
+  upstreamPath: string,
+  init: RequestInit,
+  config: RuntimeConfig,
+  upstreamProfileId: string
+): Promise<Response> {
+  ensureUpstreamReady(config);
+  const profile = getUpstreamProfileById(config, upstreamProfileId);
+  if (!profile) {
+    throw new ApiError(503, 'UPSTREAM_PROFILE_NOT_FOUND', 'configured upstream profile is not available', {
+      upstreamProfileId
+    });
+  }
+
   const baseUrl = normalizeBaseUrl(profile.baseUrl);
   const headers = new Headers(init.headers);
   headers.set('authorization', `Bearer ${profile.apiKey}`);
