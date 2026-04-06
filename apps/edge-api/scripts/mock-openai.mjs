@@ -363,6 +363,43 @@ export function createMockServer(profileId, port) {
       });
     }
 
+    if (req.method === 'GET' && url.pathname === '/fine_tuning/jobs') {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: 'ftjob_123', object: 'fine_tuning.job', status: 'running', profile: profileId }]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/fine_tuning/jobs') {
+      return createResponse(res, 200, {
+        id: 'ftjob_created',
+        object: 'fine_tuning.job',
+        model: body?.model || 'unknown',
+        training_file: body?.training_file || '',
+        status: 'validating_files',
+        profile: profileId
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === '/fine_tuning/jobs/ftjob_123') {
+      return createResponse(res, 200, {
+        id: 'ftjob_123',
+        object: 'fine_tuning.job',
+        status: 'running',
+        model: 'primary-model',
+        profile: profileId
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/fine_tuning/jobs/ftjob_123/cancel') {
+      return createResponse(res, 200, {
+        id: 'ftjob_123',
+        object: 'fine_tuning.job',
+        status: 'cancelled',
+        profile: profileId
+      });
+    }
+
     if (req.method === 'POST' && url.pathname === '/fine_tuning/jobs/ftjob_123/pause') {
       return createResponse(res, 200, {
         id: 'ftjob_123',
@@ -377,6 +414,44 @@ export function createMockServer(profileId, port) {
         id: 'ftjob_123',
         object: 'fine_tuning.job',
         status: 'running',
+        profile: profileId
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === '/fine_tuning/jobs/ftjob_123/events') {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: 'ftevent_1', object: 'fine_tuning.job.event', level: 'info', profile: profileId }]
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === '/fine_tuning/jobs/ftjob_123/checkpoints') {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: 'ftckpt_123', object: 'fine_tuning.job.checkpoint', fine_tuned_model_checkpoint: 'ft:ckpt:123', profile: profileId }]
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === '/fine_tuning/checkpoints/ftckpt_123/permissions') {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: 'perm_123', object: 'checkpoint.permission', profile: profileId }]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/fine_tuning/checkpoints/ftckpt_123/permissions') {
+      return createResponse(res, 200, {
+        id: 'perm_created',
+        object: 'checkpoint.permission',
+        profile: profileId
+      });
+    }
+
+    if (req.method === 'DELETE' && url.pathname === '/fine_tuning/checkpoints/ftckpt_123/permissions/perm_123') {
+      return createResponse(res, 200, {
+        id: 'perm_123',
+        object: 'checkpoint.permission.deleted',
+        deleted: true,
         profile: profileId
       });
     }

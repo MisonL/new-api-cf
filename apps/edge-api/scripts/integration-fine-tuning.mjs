@@ -141,6 +141,47 @@ try {
 
   await waitForWorker(`http://127.0.0.1:${EDGE_PORT}/api/status`);
 
+  const listJobs = await request('/v1/fine_tuning/jobs?limit=1');
+  assert(listJobs.response.ok, 'job list should succeed');
+  assert(Array.isArray(listJobs.json.data), 'job list should return list data');
+  assert(countHits(primary, (hit) => hit.path === '/fine_tuning/jobs' && hit.method === 'GET' && hit.search === '?limit=1') === 1, 'job list should hit default upstream and preserve query string');
+  assert(countHits(secondary, (hit) => hit.path.startsWith('/fine_tuning/jobs')) === 0, 'job list should not hit secondary');
+
+  primary.clear();
+  secondary.clear();
+
+  const createJob = await request('/v1/fine_tuning/jobs', {
+    method: 'POST',
+    body: JSON.stringify({
+      model: 'primary-model',
+      training_file: 'file_train_123',
+      validation_file: 'file_valid_123',
+      suffix: 'smoke'
+    })
+  });
+  assert(createJob.response.ok, 'job create should succeed');
+  assert(createJob.json.id === 'ftjob_created', 'job create should preserve upstream payload');
+  assert(countHits(primary, (hit) => hit.path === '/fine_tuning/jobs' && hit.method === 'POST' && hit.body?.training_file === 'file_train_123') === 1, 'job create should hit default upstream with request payload');
+
+  primary.clear();
+  secondary.clear();
+
+  const readJob = await request('/v1/fine_tuning/jobs/ftjob_123');
+  assert(readJob.response.ok, 'job detail should succeed');
+  assert(readJob.json.id === 'ftjob_123', 'job detail should preserve upstream payload');
+  assert(countHits(primary, (hit) => hit.path === '/fine_tuning/jobs/ftjob_123' && hit.method === 'GET') === 1, 'job detail should hit default upstream');
+
+  primary.clear();
+  secondary.clear();
+
+  const cancelJob = await request('/v1/fine_tuning/jobs/ftjob_123/cancel', { method: 'POST' });
+  assert(cancelJob.response.ok, 'cancel endpoint should succeed');
+  assert(cancelJob.json.status === 'cancelled', 'cancel endpoint should return cancelled status');
+  assert(countHits(primary, (hit) => hit.path === '/fine_tuning/jobs/ftjob_123/cancel') === 1, 'cancel should hit default upstream');
+
+  primary.clear();
+  secondary.clear();
+
   const pause = await request('/v1/fine_tuning/jobs/ftjob_123/pause', { method: 'POST' });
   assert(pause.response.ok, 'pause endpoint should succeed');
   assert(pause.json.status === 'paused', 'pause endpoint should return paused status');
@@ -156,11 +197,56 @@ try {
   assert(countHits(primary, (hit) => hit.path === '/fine_tuning/jobs/ftjob_123/resume') === 1, 'resume should hit default upstream');
   assert(countHits(secondary, (hit) => hit.path === '/fine_tuning/jobs/ftjob_123/resume') === 0, 'resume should not hit secondary');
 
+  primary.clear();
+  secondary.clear();
+
+  const listEvents = await request('/v1/fine_tuning/jobs/ftjob_123/events?limit=2');
+  assert(listEvents.response.ok, 'events endpoint should succeed');
+  assert(Array.isArray(listEvents.json.data), 'events endpoint should return list data');
+  assert(countHits(primary, (hit) => hit.path === '/fine_tuning/jobs/ftjob_123/events' && hit.method === 'GET' && hit.search === '?limit=2') === 1, 'events should hit default upstream and preserve query string');
+
+  primary.clear();
+  secondary.clear();
+
+  const listCheckpoints = await request('/v1/fine_tuning/jobs/ftjob_123/checkpoints?limit=2');
+  assert(listCheckpoints.response.ok, 'checkpoints endpoint should succeed');
+  assert(Array.isArray(listCheckpoints.json.data), 'checkpoints endpoint should return list data');
+  assert(countHits(primary, (hit) => hit.path === '/fine_tuning/jobs/ftjob_123/checkpoints' && hit.method === 'GET' && hit.search === '?limit=2') === 1, 'checkpoints should hit default upstream and preserve query string');
+
+  primary.clear();
+  secondary.clear();
+
+  const listPermissions = await request('/v1/fine_tuning/checkpoints/ftckpt_123/permissions?limit=1');
+  assert(listPermissions.response.ok, 'checkpoint permissions list should succeed');
+  assert(Array.isArray(listPermissions.json.data), 'checkpoint permissions list should return list data');
+  assert(countHits(primary, (hit) => hit.path === '/fine_tuning/checkpoints/ftckpt_123/permissions' && hit.method === 'GET' && hit.search === '?limit=1') === 1, 'checkpoint permissions list should hit default upstream and preserve query string');
+
+  primary.clear();
+  secondary.clear();
+
+  const createPermission = await request('/v1/fine_tuning/checkpoints/ftckpt_123/permissions', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+  assert(createPermission.response.ok, 'checkpoint permission create should succeed');
+  assert(createPermission.json.id === 'perm_created', 'checkpoint permission create should preserve upstream payload');
+  assert(countHits(primary, (hit) => hit.path === '/fine_tuning/checkpoints/ftckpt_123/permissions' && hit.method === 'POST') === 1, 'checkpoint permission create should hit default upstream');
+
+  primary.clear();
+  secondary.clear();
+
+  const deletePermission = await request('/v1/fine_tuning/checkpoints/ftckpt_123/permissions/perm_123', { method: 'DELETE' });
+  assert(deletePermission.response.ok, 'checkpoint permission delete should succeed');
+  assert(deletePermission.json.deleted === true, 'checkpoint permission delete should return deleted flag');
+  assert(countHits(primary, (hit) => hit.path === '/fine_tuning/checkpoints/ftckpt_123/permissions/perm_123' && hit.method === 'DELETE') === 1, 'checkpoint permission delete should hit default upstream');
+
   console.log(JSON.stringify({
     ok: true,
     verified: [
+      'fine-tuning job utility routes preserve query strings and payloads',
       'fine-tuning pause endpoint',
-      'fine-tuning resume endpoint'
+      'fine-tuning resume endpoint',
+      'fine-tuning checkpoint permission routes stay on default upstream'
     ]
   }, null, 2));
 } finally {
