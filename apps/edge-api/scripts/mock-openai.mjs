@@ -19,7 +19,10 @@ export function createMockServer(profileId, port) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://127.0.0.1:${port}`);
     const rawBody = await collectBody(req);
-    const body = rawBody ? JSON.parse(rawBody) : null;
+    const contentType = req.headers['content-type'] || '';
+    const body = rawBody && String(contentType).includes('application/json')
+      ? JSON.parse(rawBody)
+      : null;
     hits.push({
       profileId,
       method: req.method || 'GET',
@@ -32,6 +35,15 @@ export function createMockServer(profileId, port) {
     if (req.method === 'POST' && url.pathname === '/assistants') {
       const id = profileId === 'secondary' ? 'asst_secondary' : 'asst_primary';
       return createResponse(res, 200, { id, object: 'assistant', model: body?.model || 'unknown' });
+    }
+
+    if (req.method === 'GET' && url.pathname.startsWith('/models/')) {
+      const model = url.pathname.split('/').pop();
+      return createResponse(res, 200, {
+        id: model,
+        object: 'model',
+        owned_by: profileId
+      });
     }
 
     if (req.method === 'GET' && url.pathname.startsWith('/assistants/')) {
@@ -86,6 +98,43 @@ export function createMockServer(profileId, port) {
         thread_id: 'thread_secondary',
         status: 'queued'
       });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/realtime/sessions') {
+      return createResponse(res, 200, {
+        id: `sess_${profileId}`,
+        object: 'realtime.session',
+        model: body?.model || 'unknown',
+        client_secret: {
+          value: `ek_${profileId}`,
+          expires_at: 1234567890
+        }
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/realtime/calls') {
+      res.writeHead(201, {
+        'content-type': 'application/sdp',
+        location: `/v1/realtime/calls/call_${profileId}`
+      });
+      res.end(`answer-${profileId}`);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === `/realtime/calls/call_${profileId}/accept`) {
+      return createResponse(res, 200, { accepted: true, profile: profileId, model: body?.model || 'unknown' });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/realtime/calls/call_${profileId}/hangup`) {
+      return createResponse(res, 200, { hung_up: true, profile: profileId });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/realtime/calls/call_${profileId}/refer`) {
+      return createResponse(res, 200, { referred: true, profile: profileId, target_uri: body?.target_uri || '' });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/realtime/calls/call_${profileId}/reject`) {
+      return createResponse(res, 200, { rejected: true, profile: profileId, status_code: body?.status_code || 603 });
     }
 
     return createResponse(res, 404, { error: { message: 'unhandled route', path: url.pathname } });

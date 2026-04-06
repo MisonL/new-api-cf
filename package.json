@@ -15,6 +15,7 @@
     "check:shared": "bun run --cwd packages/shared check",
     "check:edge": "bun run --cwd apps/edge-api check",
     "check": "bun run types:edge && bun run check:shared && bun run check:edge && bun run check:web",
-    "integration:assistants": "bun run --cwd apps/edge-api integration:assistants"
+    "integration:assistants": "bun run --cwd apps/edge-api integration:assistants",
+    "integration:realtime": "bun run --cwd apps/edge-api integration:realtime"
   }
 }

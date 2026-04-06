@@ -47,6 +47,7 @@ export function createRootRouter() {
         '/v1/fine_tuning/checkpoints/:checkpointId/permissions',
         '/v1/fine_tuning/checkpoints/:checkpointId/permissions/:permissionId',
         '/v1/models',
+        '/v1/models/:model',
         '/v1/vector_stores',
         '/v1/vector_stores/:vectorStoreId',
         '/v1/vector_stores/:vectorStoreId/files',
@@ -85,6 +86,11 @@ export function createRootRouter() {
         '/v1/uploads/:uploadId/cancel',
         '/v1/realtime/client_secrets',
         '/v1/realtime/calls',
+        '/v1/realtime/calls/:callId/accept',
+        '/v1/realtime/calls/:callId/hangup',
+        '/v1/realtime/calls/:callId/refer',
+        '/v1/realtime/calls/:callId/reject',
+        '/v1/realtime/sessions',
         '/v1/realtime/transcription_sessions'
       ]
     });

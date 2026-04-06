@@ -29,6 +29,23 @@ function getUpstreamHeaders(apiKey: string, contentType?: string) {
   return headers;
 }
 
+function buildProxyResponseHeaders(response: Response) {
+  const responseHeaders = new Headers();
+  const contentType = response.headers.get('content-type');
+  if (contentType) {
+    responseHeaders.set('content-type', contentType);
+  }
+  const upstreamRequestId = response.headers.get('x-request-id');
+  if (upstreamRequestId) {
+    responseHeaders.set('x-upstream-request-id', upstreamRequestId);
+  }
+  const location = response.headers.get('location');
+  if (location) {
+    responseHeaders.set('location', location);
+  }
+  return responseHeaders;
+}
+
 export function buildModelList(config: RuntimeConfig): ModelDescriptor[] {
   return config.upstreamProfiles.flatMap((profile) =>
     profile.modelAllowlist.map((modelId) => ({
@@ -198,19 +215,9 @@ export async function forwardOpenAiUtilityRequest(
     headers
   });
 
-  const responseHeaders = new Headers();
-  const contentType = response.headers.get('content-type');
-  if (contentType) {
-    responseHeaders.set('content-type', contentType);
-  }
-  const upstreamRequestId = response.headers.get('x-request-id');
-  if (upstreamRequestId) {
-    responseHeaders.set('x-upstream-request-id', upstreamRequestId);
-  }
-
   return new Response(response.body, {
     status: response.status,
-    headers: responseHeaders
+    headers: buildProxyResponseHeaders(response)
   });
 }
 
@@ -237,19 +244,9 @@ export async function forwardOpenAiProfileUtilityRequest(
     headers
   });
 
-  const responseHeaders = new Headers();
-  const contentType = response.headers.get('content-type');
-  if (contentType) {
-    responseHeaders.set('content-type', contentType);
-  }
-  const upstreamRequestId = response.headers.get('x-request-id');
-  if (upstreamRequestId) {
-    responseHeaders.set('x-upstream-request-id', upstreamRequestId);
-  }
-
   return new Response(response.body, {
     status: response.status,
-    headers: responseHeaders
+    headers: buildProxyResponseHeaders(response)
   });
 }
 
@@ -319,19 +316,9 @@ export async function forwardOpenAiModelUtilityRequest(
       signal: abortController.signal
     });
 
-    const responseHeaders = new Headers();
-    const contentType = response.headers.get('content-type');
-    if (contentType) {
-      responseHeaders.set('content-type', contentType);
-    }
-    const upstreamRequestId = response.headers.get('x-request-id');
-    if (upstreamRequestId) {
-      responseHeaders.set('x-upstream-request-id', upstreamRequestId);
-    }
-
     return new Response(response.body, {
       status: response.status,
-      headers: responseHeaders
+      headers: buildProxyResponseHeaders(response)
     });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {

@@ -75,6 +75,7 @@
   - `POST /v1/fine_tuning/checkpoints/:checkpointId/permissions`
   - `DELETE /v1/fine_tuning/checkpoints/:checkpointId/permissions/:permissionId`
   - `GET /v1/models`
+  - `GET /v1/models/:model`
   - `GET /v1/vector_stores`
   - `POST /v1/vector_stores`
   - `GET /v1/vector_stores/:vectorStoreId`
@@ -126,6 +127,11 @@
   - `POST /v1/uploads/:uploadId/cancel`
   - `POST /v1/realtime/client_secrets`
   - `POST /v1/realtime/calls`
+  - `POST /v1/realtime/calls/:callId/accept`
+  - `POST /v1/realtime/calls/:callId/hangup`
+  - `POST /v1/realtime/calls/:callId/refer`
+  - `POST /v1/realtime/calls/:callId/reject`
+  - `POST /v1/realtime/sessions`
   - `POST /v1/realtime/transcription_sessions`
 - `apps/admin-web`
   - React + Vite 前端骨架
@@ -156,6 +162,7 @@
   - `api_tokens`
   - `relay_assistants`
   - `relay_threads`
+  - `relay_realtime_calls`
   - `usage_daily`
 - 若绑定 `MODEL_CATALOG_CACHE`，Worker 会把“启用中的模型目录快照”写入 KV：
   - 只在 bootstrap / 模型更新时刷新
@@ -178,9 +185,12 @@
   - admin session
   - 或 D1 API token
 - `files`、`batches`、`fine_tuning/jobs`、`vector_stores`、`uploads` 和 `conversations` 相关接口当前固定走默认 upstream profile，不参与模型目录校验；`realtime/client_secrets`、`realtime/calls` 与 `realtime/transcription_sessions` 会按请求体中的模型字段走模型目录与 upstream profile 映射
+- `GET /v1/models/:model` 直接基于本地模型目录返回单模型详情，不再额外请求上游
 - `assistants` 在创建或带 `model` 更新后，会把 `assistant_id -> upstream_profile_id` 映射写入 D1；后续 `GET/POST/DELETE /v1/assistants/:assistantId` 会优先按该映射回到正确上游，避免多 profile 场景下打错 provider
 - `threads` 在创建或 `threads/runs` 返回新 thread 后，也会把 `thread_id -> upstream_profile_id` 映射写入 D1；后续 messages 和 runs 相关接口会优先按该映射回到正确上游
 - `runs` 当前按 assistant / thread 映射选择 upstream profile；若 `POST /v1/threads/:threadId/runs` 中 thread 与 assistant 归属的 profile 不一致，会显式返回 `THREAD_ASSISTANT_PROFILE_MISMATCH`
+- `realtime/sessions` 会按请求体中的 `model` 选择 upstream profile；`realtime/calls` 在创建成功后会把 `call_id -> upstream_profile_id` 映射写入 D1，并保留上游 `Location` 响应头
+- `realtime/calls/:callId/hangup|refer|reject` 当前要求本地已存在该 call 的 upstream 归属；若未知，会显式返回 `REALTIME_CALL_PROFILE_UNKNOWN`，不做静默默认路由
 - 若本地尚未记录某个既有 assistant 或 thread 的 profile 归属，Worker 会先对各 upstream 做一次只读探测；找到命中的 profile 后会立刻回写本地 registry，后续请求不再重复探测
 - 当前已接入 D1，KV / Durable Objects / Queues 仍未接入
 
@@ -192,6 +202,7 @@ bun run types:edge
 bun run check
 bun run --cwd apps/edge-api d1:migrate:local
 bun run integration:assistants
+bun run integration:realtime
 ```
 
 环境变量：
@@ -256,6 +267,18 @@ bun run integration:assistants
   - legacy assistant 首次访问时自动探测 upstream，并把归属写回本地 registry
   - `POST /v1/threads/runs` 返回的新 thread 会继承 assistant 的 upstream profile
   - `POST /v1/threads/:threadId/runs` 在 thread 与 assistant 分属不同 profile 时显式返回 `THREAD_ASSISTANT_PROFILE_MISMATCH`
+- 脚本执行完成后会自动清理临时状态目录和本地进程
+
+realtime + model detail 联调：
+
+- 运行 `bun run integration:realtime`
+- 脚本会自动启动两个本地 mock upstream 和一个本地 Worker
+- 自动验证以下行为：
+  - `GET /v1/models/:model` 基于本地模型目录返回详情
+  - `POST /v1/realtime/sessions` 按 `model` 路由到正确 upstream
+  - `POST /v1/realtime/calls` 保留上游 `Location` 响应头，并写入 `call_id -> upstream_profile_id`
+  - `POST /v1/realtime/calls/:callId/*` 通过本地 registry 回到正确 upstream
+  - 未知 `call_id` 会显式返回 `REALTIME_CALL_PROFILE_UNKNOWN`
 - 脚本执行完成后会自动清理临时状态目录和本地进程
 
 ## 目录结构
