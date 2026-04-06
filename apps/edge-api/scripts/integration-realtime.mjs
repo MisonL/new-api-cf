@@ -150,6 +150,23 @@ try {
   assert(model.response.ok, 'model detail should be returned from local catalog');
   assert(model.json.id === 'secondary-model', 'model detail should match requested model');
 
+  const clientSecret = await request('/v1/realtime/client_secrets', {
+    method: 'POST',
+    body: JSON.stringify({
+      session: {
+        model: 'secondary-model',
+        type: 'realtime'
+      }
+    })
+  });
+  assert(clientSecret.response.ok, 'realtime client secret creation should succeed');
+  assert(clientSecret.json.id === 'secret_secondary', 'realtime client secret should use selected upstream');
+  assert(countHits(primary, (hit) => hit.path === '/realtime/client_secrets') === 0, 'primary must not receive secondary client secret request');
+  assert(countHits(secondary, (hit) => hit.path === '/realtime/client_secrets' && hit.body?.session?.model === 'secondary-model') === 1, 'secondary should receive client secret request');
+
+  primary.clear();
+  secondary.clear();
+
   const session = await request('/v1/realtime/sessions', {
     method: 'POST',
     body: JSON.stringify({ model: 'secondary-model', type: 'realtime' })
@@ -158,6 +175,25 @@ try {
   assert(session.json.id === 'sess_secondary', 'realtime session should use selected upstream');
   assert(countHits(primary, (hit) => hit.path === '/realtime/sessions') === 0, 'primary must not receive secondary session request');
   assert(countHits(secondary, (hit) => hit.path === '/realtime/sessions') === 1, 'secondary should receive session request');
+
+  primary.clear();
+  secondary.clear();
+
+  const transcriptionSession = await request('/v1/realtime/transcription_sessions', {
+    method: 'POST',
+    body: JSON.stringify({
+      input_audio_transcription: {
+        model: 'secondary-model'
+      },
+      turn_detection: {
+        type: 'server_vad'
+      }
+    })
+  });
+  assert(transcriptionSession.response.ok, 'realtime transcription session should succeed');
+  assert(transcriptionSession.json.id === 'tsess_secondary', 'realtime transcription session should use selected upstream');
+  assert(countHits(primary, (hit) => hit.path === '/realtime/transcription_sessions') === 0, 'primary must not receive secondary transcription session request');
+  assert(countHits(secondary, (hit) => hit.path === '/realtime/transcription_sessions' && hit.body?.input_audio_transcription?.model === 'secondary-model') === 1, 'secondary should receive transcription session request');
 
   primary.clear();
   secondary.clear();
@@ -226,7 +262,9 @@ try {
     ok: true,
     verified: [
       'model detail endpoint',
+      'realtime client secret model routing',
       'realtime session model routing',
+      'realtime transcription session model routing',
       'realtime call location passthrough',
       'realtime call profile registry',
       'explicit failure for unknown realtime call profile'

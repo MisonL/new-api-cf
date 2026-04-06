@@ -219,6 +219,17 @@ export function createMockServer(profileId, port) {
       return createResponse(res, 404, { error: { message: 'not found' } });
     }
 
+    if (req.method === 'POST' && url.pathname === '/realtime/client_secrets') {
+      return createResponse(res, 200, {
+        id: `secret_${profileId}`,
+        object: 'realtime.client_secret',
+        session: {
+          model: body?.session?.model || 'unknown'
+        },
+        value: `rt_${profileId}`
+      });
+    }
+
     if (req.method === 'POST' && url.pathname === '/realtime/sessions') {
       return createResponse(res, 200, {
         id: `sess_${profileId}`,
@@ -227,6 +238,16 @@ export function createMockServer(profileId, port) {
         client_secret: {
           value: `ek_${profileId}`,
           expires_at: 1234567890
+        }
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/realtime/transcription_sessions') {
+      return createResponse(res, 200, {
+        id: `tsess_${profileId}`,
+        object: 'realtime.transcription_session',
+        input_audio_transcription: {
+          model: body?.input_audio_transcription?.model || 'unknown'
         }
       });
     }

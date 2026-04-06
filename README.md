@@ -258,6 +258,7 @@ bun run integration:all
 - `bun run integration:threads-runs` 会启动本地 mock upstream 与本地 worker，验证 `threads/messages/runs` 在多 upstream 场景下保持 registry 归属、query string 透传和 legacy thread 自动探测缓存
 - `bun run integration:core-relay` 会启动本地 mock upstream 与本地 worker，验证 `audio/chat/completions/embeddings/images/moderations` 这组模型路由接口按 `model` 选择 upstream，且 multipart 与二进制响应保持透传
 - `bun run integration:conversations` 会启动本地 mock upstream 与本地 worker，验证 `conversations` 工具接口固定走默认 upstream profile，且 item CRUD 保持透传
+- `bun run integration:realtime` 会启动本地 mock upstream 与本地 worker，验证 `client_secrets`、`sessions`、`transcription_sessions` 和 `calls` 这组 realtime 接口按模型选择 upstream，且 call registry 与 `Location` 头透传正常
 - `bun run integration:all` 会串行执行当前全部专项联调脚本，作为本地统一门禁入口
 - `AUTH_MODE=jwt` 下，管理接口通过 Bearer JWT 校验：
   - 当前要求 `HS256`
