@@ -149,6 +149,7 @@ try {
   const createConversation = await request('/v1/conversations', {
     method: 'POST',
     body: JSON.stringify({
+      items: [{ role: 'system', content: 'seed' }],
       metadata: {
         source: 'integration'
       }
@@ -156,7 +157,8 @@ try {
   });
   assert(createConversation.response.ok, 'conversation creation should succeed');
   assert(createConversation.json.id === 'conv_primary', 'conversation should be created on default upstream');
-  assert(countHits(primary, (hit) => hit.path === '/conversations' && hit.method === 'POST') === 1, 'conversation creation should hit primary');
+  assert(Array.isArray(createConversation.json.items), 'conversation creation should preserve upstream payload');
+  assert(countHits(primary, (hit) => hit.path === '/conversations' && hit.method === 'POST' && hit.body?.items?.[0]?.role === 'system' && hit.body?.metadata?.source === 'integration') === 1, 'conversation creation should preserve JSON payload on primary');
   assert(countHits(secondary, (hit) => hit.path === '/conversations') === 0, 'conversation creation should not hit secondary');
 
   primary.clear();
@@ -180,15 +182,15 @@ try {
   });
   assert(updateConversation.response.ok, 'conversation update should succeed');
   assert(updateConversation.json.metadata.updated === 'true', 'conversation update should preserve JSON payload');
-  assert(countHits(primary, (hit) => hit.path === '/conversations/conv_primary' && hit.method === 'POST') === 1, 'conversation update should hit primary');
+  assert(countHits(primary, (hit) => hit.path === '/conversations/conv_primary' && hit.method === 'POST' && hit.body?.metadata?.updated === 'true') === 1, 'conversation update should preserve JSON payload on primary');
 
   primary.clear();
   secondary.clear();
 
-  const listItems = await request('/v1/conversations/conv_primary/items');
+  const listItems = await request('/v1/conversations/conv_primary/items?limit=1');
   assert(listItems.response.ok, 'conversation item list should succeed');
   assert(Array.isArray(listItems.json.data), 'conversation item list should return list data');
-  assert(countHits(primary, (hit) => hit.path === '/conversations/conv_primary/items' && hit.method === 'GET') === 1, 'conversation item list should hit primary');
+  assert(countHits(primary, (hit) => hit.path === '/conversations/conv_primary/items' && hit.method === 'GET' && hit.search === '?limit=1') === 1, 'conversation item list should preserve query string on primary');
 
   primary.clear();
   secondary.clear();
@@ -201,15 +203,17 @@ try {
   });
   assert(createItems.response.ok, 'conversation item create should succeed');
   assert(Array.isArray(createItems.json.data), 'conversation item create should return list data');
-  assert(countHits(primary, (hit) => hit.path === '/conversations/conv_primary/items' && hit.method === 'POST') === 1, 'conversation item create should hit primary');
+  assert(createItems.json.data[0]?.role === 'user', 'conversation item create should preserve upstream payload');
+  assert(countHits(primary, (hit) => hit.path === '/conversations/conv_primary/items' && hit.method === 'POST' && hit.body?.items?.[0]?.content === 'hello') === 1, 'conversation item create should preserve JSON payload on primary');
 
   primary.clear();
   secondary.clear();
 
-  const readItem = await request('/v1/conversations/conv_primary/items/item_primary');
+  const readItem = await request('/v1/conversations/conv_primary/items/item_primary?include=content');
   assert(readItem.response.ok, 'conversation item detail should succeed');
   assert(readItem.json.id === 'item_primary', 'conversation item detail should preserve upstream payload');
-  assert(countHits(primary, (hit) => hit.path === '/conversations/conv_primary/items/item_primary') === 1, 'conversation item detail should hit primary');
+  assert(readItem.json.role === 'user', 'conversation item detail should preserve upstream metadata');
+  assert(countHits(primary, (hit) => hit.path === '/conversations/conv_primary/items/item_primary' && hit.method === 'GET' && hit.search === '?include=content') === 1, 'conversation item detail should preserve query string on primary');
 
   primary.clear();
   secondary.clear();
@@ -233,6 +237,7 @@ try {
     verified: [
       'conversation utility routes use default upstream profile',
       'conversation create and update preserve JSON payloads',
+      'conversation item routes preserve query string and JSON payloads',
       'conversation item CRUD routes stay on default upstream'
     ]
   }, null, 2));
