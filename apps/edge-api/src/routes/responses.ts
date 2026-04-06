@@ -5,7 +5,7 @@ import { ApiError } from '../lib/errors';
 import { requireRelayAccess } from '../lib/relay-auth';
 import { enforceRelayRateLimit } from '../lib/relay-rate-limit';
 import { deleteResponseRegistry, getResponseUpstreamProfileId, upsertResponseRegistry } from '../lib/response-registry';
-import { discoverOpenAiProfileId, forwardOpenAiModelUtilityRequest, forwardOpenAiProfileUtilityRequest, forwardOpenAiUtilityRequest, forwardResponseCreate, resolveUpstreamProfileIdForModel } from '../lib/upstream';
+import { discoverOpenAiProfileId, forwardOpenAiModelUtilityRequest, forwardOpenAiProfileUtilityRequest, forwardOpenAiUtilityRequest, forwardResponseCreate, forwardResponseCreateToProfile, resolveUpstreamProfileIdForModel } from '../lib/upstream';
 import { responseCreateRequestSchema } from '../schemas/responses';
 
 const responseInputTokensRequestSchema = z.object({
@@ -48,8 +48,25 @@ export function createResponsesRouter() {
     const config = getRuntimeConfig(c.env);
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
-    const upstreamProfileId = await resolveUpstreamProfileIdForModel(c.env, request.model, config);
-    const response = await forwardResponseCreate(c.env, request, config, access);
+    const requestedProfileId = await resolveUpstreamProfileIdForModel(c.env, request.model, config);
+    const previousResponseId = request.previous_response_id || null;
+    const previousProfileId = previousResponseId
+      ? await resolveResponseProfileId(c.env, previousResponseId, config)
+      : null;
+
+    if (previousProfileId && previousProfileId !== requestedProfileId) {
+      throw new ApiError(409, 'RESPONSE_PREVIOUS_PROFILE_MISMATCH', 'previous response belongs to a different upstream profile than the requested model', {
+        previousResponseId,
+        previousUpstreamProfileId: previousProfileId,
+        requestedUpstreamProfileId: requestedProfileId,
+        model: request.model
+      });
+    }
+
+    const upstreamProfileId = previousProfileId || requestedProfileId;
+    const response = previousProfileId
+      ? await forwardResponseCreateToProfile(c.env, request, config, access, upstreamProfileId)
+      : await forwardResponseCreate(c.env, request, config, access);
     const responseId = await readResponseId(response);
     if (response.ok && responseId) {
       await upsertResponseRegistry(c.env, {

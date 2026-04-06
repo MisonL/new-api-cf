@@ -144,6 +144,16 @@ export async function forwardResponseCreate(
   return forwardOpenAiRequest(env, '/responses', request.model, request, config, access);
 }
 
+export async function forwardResponseCreateToProfile(
+  env: Env,
+  request: ResponseCreateRequestShape,
+  config: RuntimeConfig,
+  access: RelayAccessContext,
+  upstreamProfileId: string
+): Promise<Response> {
+  return forwardOpenAiRequestToProfile(env, '/responses', request.model, request, config, access, upstreamProfileId);
+}
+
 export async function forwardEmbeddingsCreate(
   env: Env,
   request: EmbeddingsCreateRequestShape,
@@ -381,6 +391,26 @@ async function forwardOpenAiRequest(
   const catalog = await resolveModelCatalog(env, config);
   assertModelAllowed(model, catalog.models, catalog.stateStore);
   const profile = resolveUpstreamProfile(config, catalog.models, model);
+  return forwardOpenAiRequestToProfile(env, upstreamPath, model, request, config, access, profile.id, requestContentType);
+}
+
+async function forwardOpenAiRequestToProfile(
+  env: Env,
+  upstreamPath: string,
+  model: string,
+  request: FormData | unknown,
+  config: RuntimeConfig,
+  access: RelayAccessContext,
+  upstreamProfileId: string,
+  requestContentType = 'application/json'
+): Promise<Response> {
+  ensureUpstreamReady(config);
+  const profile = getUpstreamProfileById(config, upstreamProfileId);
+  if (!profile) {
+    throw new ApiError(503, 'UPSTREAM_PROFILE_NOT_FOUND', 'configured upstream profile is not available', {
+      upstreamProfileId
+    });
+  }
 
   const baseUrl = normalizeBaseUrl(profile.baseUrl);
   const abortController = new AbortController();

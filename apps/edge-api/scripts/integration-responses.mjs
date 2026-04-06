@@ -155,6 +155,30 @@ try {
   primary.clear();
   secondary.clear();
 
+  const followup = await request('/v1/responses', {
+    method: 'POST',
+    body: JSON.stringify({ model: 'secondary-model', input: 'followup', previous_response_id: 'resp_secondary' })
+  });
+  assert(followup.response.ok, 'followup response should succeed on stored profile');
+  assert(followup.json.id === 'resp_secondary_followup', 'followup response should be created on secondary');
+  assert(countHits(primary, (hit) => hit.path === '/responses' && hit.method === 'POST') === 0, 'followup should not hit primary');
+  assert(countHits(secondary, (hit) => hit.path === '/responses' && hit.method === 'POST') === 1, 'followup should hit secondary');
+
+  primary.clear();
+  secondary.clear();
+
+  const mismatch = await request('/v1/responses', {
+    method: 'POST',
+    body: JSON.stringify({ model: 'primary-model', input: 'mismatch', previous_response_id: 'resp_secondary' })
+  });
+  assert(mismatch.response.status === 409, 'response continuation mismatch should fail with 409');
+  assert(mismatch.json.error.code === 'RESPONSE_PREVIOUS_PROFILE_MISMATCH', 'response continuation mismatch should return explicit code');
+  assert(countHits(primary, (hit) => hit.path === '/responses' && hit.method === 'POST') === 0, 'mismatch should fail before upstream request');
+  assert(countHits(secondary, (hit) => hit.path === '/responses' && hit.method === 'POST') === 0, 'mismatch should fail before upstream request');
+
+  primary.clear();
+  secondary.clear();
+
   const retrieved = await request('/v1/responses/resp_secondary');
   assert(retrieved.response.ok, 'stored response should be retrievable');
   assert(countHits(primary, (hit) => hit.path === '/responses/resp_secondary') === 0, 'stored response should not probe primary');
@@ -174,6 +198,17 @@ try {
   assert(legacy.response.ok, 'legacy response should be discoverable');
   assert(countHits(primary, (hit) => hit.path === '/responses/resp_legacy') === 1, 'legacy response should probe primary first');
   assert(countHits(secondary, (hit) => hit.path === '/responses/resp_legacy') === 2, 'legacy response should probe then read from secondary');
+
+  primary.clear();
+  secondary.clear();
+
+  const legacyFollowup = await request('/v1/responses', {
+    method: 'POST',
+    body: JSON.stringify({ model: 'secondary-model', input: 'legacy followup', previous_response_id: 'resp_legacy' })
+  });
+  assert(legacyFollowup.response.ok, 'legacy followup should reuse discovered profile');
+  assert(countHits(primary, (hit) => hit.path === '/responses' && hit.method === 'POST') === 0, 'legacy followup should not hit primary');
+  assert(countHits(secondary, (hit) => hit.path === '/responses' && hit.method === 'POST') === 1, 'legacy followup should hit secondary');
 
   primary.clear();
   secondary.clear();
@@ -203,8 +238,11 @@ try {
     ok: true,
     verified: [
       'response affinity persistence after create',
+      'response continuation uses stored profile',
+      'response continuation mismatch is rejected before upstream',
       'response input_items route through stored profile',
       'legacy response upstream discovery cache',
+      'legacy response continuation reuses discovered profile',
       'response cancel route through discovered profile',
       'response delete route through stored or discovered profile'
     ]

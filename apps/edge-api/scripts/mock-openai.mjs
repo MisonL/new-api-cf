@@ -138,6 +138,22 @@ export function createMockServer(profileId, port) {
     }
 
     if (req.method === 'POST' && url.pathname === '/responses') {
+      if (body?.previous_response_id === 'resp_secondary' && profileId === 'secondary') {
+        return createResponse(res, 200, {
+          id: 'resp_secondary_followup',
+          object: 'response',
+          model: body?.model || 'unknown',
+          previous_response_id: body.previous_response_id
+        });
+      }
+      if (body?.previous_response_id === 'resp_legacy' && profileId === 'secondary') {
+        return createResponse(res, 200, {
+          id: 'resp_legacy_followup',
+          object: 'response',
+          model: body?.model || 'unknown',
+          previous_response_id: body.previous_response_id
+        });
+      }
       return createResponse(res, 200, {
         id: `resp_${profileId}`,
         object: 'response',

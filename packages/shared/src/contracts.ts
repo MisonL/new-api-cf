@@ -90,6 +90,7 @@ export interface ResponseCreateRequestShape {
   model: string;
   input: unknown;
   instructions?: string;
+  previous_response_id?: string | null;
   stream?: boolean;
   [key: string]: unknown;
 }

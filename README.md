@@ -188,6 +188,7 @@
 - `files`、`batches`、`fine_tuning/jobs`、`vector_stores`、`uploads` 和 `conversations` 相关接口当前固定走默认 upstream profile，不参与模型目录校验；`realtime/client_secrets`、`realtime/calls` 与 `realtime/transcription_sessions` 会按请求体中的模型字段走模型目录与 upstream profile 映射
 - `GET /v1/models/:model` 直接基于本地模型目录返回单模型详情，不再额外请求上游
 - `responses` 在创建成功后，会把 `response_id -> upstream_profile_id` 映射写入 D1；后续 `GET/DELETE/cancel/input_items` 会优先按该映射回到正确上游
+- 若 `POST /v1/responses` 带有 `previous_response_id`，Worker 会优先沿用前一条 response 的 upstream 归属；若它和当前 `model` 映射出的 profile 不一致，会显式返回 `RESPONSE_PREVIOUS_PROFILE_MISMATCH`
 - `assistants` 在创建或带 `model` 更新后，会把 `assistant_id -> upstream_profile_id` 映射写入 D1；后续 `GET/POST/DELETE /v1/assistants/:assistantId` 会优先按该映射回到正确上游，避免多 profile 场景下打错 provider
 - `threads` 在创建或 `threads/runs` 返回新 thread 后，也会把 `thread_id -> upstream_profile_id` 映射写入 D1；后续 messages 和 runs 相关接口会优先按该映射回到正确上游
 - `runs` 当前按 assistant / thread 映射选择 upstream profile；若 `POST /v1/threads/:threadId/runs` 中 thread 与 assistant 归属的 profile 不一致，会显式返回 `THREAD_ASSISTANT_PROFILE_MISMATCH`
@@ -290,6 +291,8 @@ responses 多 upstream 联调：
 - 脚本会自动启动两个本地 mock upstream 和一个本地 Worker
 - 自动验证以下行为：
   - `POST /v1/responses` 创建后会持久化 `response_id -> upstream_profile_id`
+  - 带 `previous_response_id` 的续写请求会复用上一条 response 的 upstream
+  - 若 `previous_response_id` 与当前 `model` 归属不同 profile，会显式返回 `RESPONSE_PREVIOUS_PROFILE_MISMATCH`
   - `GET /v1/responses/:responseId` 与 `/input_items` 会按已记录 profile 回到正确 upstream
   - 既有 legacy response 首次访问时会自动发现 upstream 并回写 registry
   - `cancel` 与 `delete` 会优先走已记录或已发现的 upstream
