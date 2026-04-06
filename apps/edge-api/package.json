@@ -18,7 +18,8 @@
     "integration:files": "node ./scripts/integration-files.mjs",
     "integration:batches": "node ./scripts/integration-batches.mjs",
     "integration:core-relay": "node ./scripts/integration-core-relay.mjs",
-    "integration:conversations": "node ./scripts/integration-conversations.mjs"
+    "integration:conversations": "node ./scripts/integration-conversations.mjs",
+    "integration:all": "bun run integration:assistants && bun run integration:fine-tuning && bun run integration:realtime && bun run integration:responses && bun run integration:vector-stores && bun run integration:uploads && bun run integration:files && bun run integration:batches && bun run integration:core-relay && bun run integration:conversations"
   },
   "dependencies": {
     "hono": "^4.12.10",

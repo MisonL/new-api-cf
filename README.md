@@ -217,6 +217,7 @@ bun run integration:files
 bun run integration:batches
 bun run integration:core-relay
 bun run integration:conversations
+bun run integration:all
 ```
 
 环境变量：
@@ -253,6 +254,7 @@ bun run integration:conversations
 - `bun run integration:batches` 会启动本地 mock upstream 与本地 worker，验证 `batches` 工具接口固定走默认 upstream profile
 - `bun run integration:core-relay` 会启动本地 mock upstream 与本地 worker，验证 `audio/chat/completions/embeddings/images/moderations` 这组模型路由接口按 `model` 选择 upstream，且 multipart 与二进制响应保持透传
 - `bun run integration:conversations` 会启动本地 mock upstream 与本地 worker，验证 `conversations` 工具接口固定走默认 upstream profile，且 item CRUD 保持透传
+- `bun run integration:all` 会串行执行当前全部专项联调脚本，作为本地统一门禁入口
 - `AUTH_MODE=jwt` 下，管理接口通过 Bearer JWT 校验：
   - 当前要求 `HS256`
   - payload 至少满足 `role=admin` 或 `sub=admin`
@@ -373,9 +375,25 @@ conversations 工具链联调：
 - 脚本会自动启动两个本地 mock upstream 和一个本地 Worker
 - 自动验证以下行为：
   - `POST /v1/conversations`、`GET /v1/conversations/:conversationId`、`POST /v1/conversations/:conversationId`、`DELETE /v1/conversations/:conversationId` 固定走默认 upstream profile
-  - `GET/POST/DELETE /v1/conversations/:conversationId/items*` 固定回到默认 upstream
-  - conversation 与 item 的 JSON 请求体和删除响应不会被 Worker 改写
+- `GET/POST/DELETE /v1/conversations/:conversationId/items*` 固定回到默认 upstream
+- conversation 与 item 的 JSON 请求体和删除响应不会被 Worker 改写
 - 脚本执行完成后会自动清理临时状态目录和本地进程
+
+统一联调门禁：
+
+- 运行 `bun run integration:all`
+- 当前会串行执行：
+  - `assistants`
+  - `fine-tuning`
+  - `realtime`
+  - `responses`
+  - `vector-stores`
+  - `uploads`
+  - `files`
+  - `batches`
+  - `core-relay`
+  - `conversations`
+- 适合作为本地收口和 CI 门禁入口
 
 ## 目录结构
 

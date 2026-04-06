@@ -24,6 +24,7 @@
     "integration:files": "bun run --cwd apps/edge-api integration:files",
     "integration:batches": "bun run --cwd apps/edge-api integration:batches",
     "integration:core-relay": "bun run --cwd apps/edge-api integration:core-relay",
-    "integration:conversations": "bun run --cwd apps/edge-api integration:conversations"
+    "integration:conversations": "bun run --cwd apps/edge-api integration:conversations",
+    "integration:all": "bun run --cwd apps/edge-api integration:all"
   }
 }
