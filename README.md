@@ -251,6 +251,7 @@ bun run integration:all
 - 旧的 `OPENAI_*` 单 profile 环境变量仍可继续作为兼容入口
 - `bun run integration:fine-tuning` 会启动本地 mock upstream 与本地 worker，验证 `jobs/create/detail/cancel/pause/resume/events/checkpoints/permissions` 这组 fine-tuning utility 端点固定转发到默认 upstream profile，且 query string 与 JSON 请求体保持透传
 - `bun run integration:control-plane` 会启动本地 worker，验证 `status/auth/admin/models/token` 这组控制面接口在 session 模式下的登录、bootstrap、模型启停、usage 参数校验和 token 生命周期
+- `bun run integration:jwt-auth` 会启动一个 `AUTH_MODE=jwt` 的本地 worker，验证 `HS256 + exp + issuer/audience + admin identity` 这些约束都真实生效，且有效 JWT 可以访问管理面和 relay 模型目录
 - `bun run integration:model-cache` 会启动一个带 KV 绑定的本地 worker，验证 `MODEL_CATALOG_CACHE` 已真实接线：bootstrap / 模型更新会刷新快照，`relay_models` 被清空后 `/api/models` 和 relay 仍可继续使用缓存目录
 - `bun run integration:state-plane` 会启动一个带 Queue / Durable Object 绑定的本地 worker，验证状态面能力已经真实接线：`status` 暴露绑定状态、usage 经 Queue 聚合回 D1、Relay 速率门禁经 Durable Object 生效
 - `bun run integration:assistants` 会启动本地 mock upstream 与本地 worker，验证 `assistants` 的 list/create/detail/update/delete 以及 `threads/runs` 关联助手的路由归属、beta header、query string 和 legacy 自动探测缓存
@@ -386,7 +387,18 @@ model catalog cache 联调：
 - 自动验证以下行为：
   - `GET /api/status` 会正确暴露 `kvConfigured`
   - bootstrap 和模型启停会刷新启用中模型目录的 KV 快照
-  - 即便本地 D1 中的 `relay_models` 被清空，`/api/models`、`/v1/models` 和核心 relay 仍可继续使用缓存目录
+- 即便本地 D1 中的 `relay_models` 被清空，`/api/models`、`/v1/models` 和核心 relay 仍可继续使用缓存目录
+- 脚本执行完成后会自动清理临时状态目录和本地进程
+
+jwt auth 联调：
+
+- 运行 `bun run integration:jwt-auth`
+- 脚本会自动启动一个 `AUTH_MODE=jwt` 的本地 Worker
+- 自动验证以下行为：
+  - `GET /api/status` 与 `GET /api/auth/session` 会正确暴露 jwt 模式状态
+  - `POST /api/auth/login` 在 jwt 模式下显式返回 `LOGIN_NOT_AVAILABLE`
+  - JWT 校验会同时约束 `HS256`、`exp`、`issuer`、`audience` 和 `role=admin` / `sub=admin`
+  - 合法 admin JWT 可访问 `/api/admin/*` 与 `/v1/models*`
 - 脚本执行完成后会自动清理临时状态目录和本地进程
 
 state plane 联调：
@@ -416,6 +428,7 @@ conversations 工具链联调：
   - `assistants`
   - `threads-runs`
   - `control-plane`
+  - `jwt-auth`
   - `model-cache`
   - `state-plane`
   - `fine-tuning`

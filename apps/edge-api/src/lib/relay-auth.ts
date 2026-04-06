@@ -23,7 +23,7 @@ export async function requireRelayAccess(c: Context, config: RuntimeConfig): Pro
   const bearerToken = readBearerToken(c.req.header('Authorization'));
   const adminSession = await getAdminSessionOrNull(c, config);
 
-  if (config.authMode === 'bearer' && adminSession) {
+  if ((config.authMode === 'bearer' || config.authMode === 'jwt') && adminSession) {
     return {
       kind: 'admin-session',
       session: adminSession,
