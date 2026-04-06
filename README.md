@@ -181,6 +181,7 @@
 - `assistants` 在创建或带 `model` 更新后，会把 `assistant_id -> upstream_profile_id` 映射写入 D1；后续 `GET/POST/DELETE /v1/assistants/:assistantId` 会优先按该映射回到正确上游，避免多 profile 场景下打错 provider
 - `threads` 在创建或 `threads/runs` 返回新 thread 后，也会把 `thread_id -> upstream_profile_id` 映射写入 D1；后续 messages 和 runs 相关接口会优先按该映射回到正确上游
 - `runs` 当前按 assistant / thread 映射选择 upstream profile；若 `POST /v1/threads/:threadId/runs` 中 thread 与 assistant 归属的 profile 不一致，会显式返回 `THREAD_ASSISTANT_PROFILE_MISMATCH`
+- 若本地尚未记录某个既有 assistant 或 thread 的 profile 归属，Worker 会先对各 upstream 做一次只读探测；找到命中的 profile 后会立刻回写本地 registry，后续请求不再重复探测
 - 当前已接入 D1，KV / Durable Objects / Queues 仍未接入
 
 ## 开发命令

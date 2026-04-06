@@ -6,7 +6,7 @@ import { ApiError } from '../lib/errors';
 import { requireRelayAccess } from '../lib/relay-auth';
 import { enforceRelayRateLimit } from '../lib/relay-rate-limit';
 import { getThreadUpstreamProfileId, upsertThreadRegistry } from '../lib/thread-registry';
-import { forwardOpenAiProfileUtilityRequest, forwardOpenAiUtilityRequest } from '../lib/upstream';
+import { discoverOpenAiProfileId, forwardOpenAiProfileUtilityRequest, forwardOpenAiUtilityRequest } from '../lib/upstream';
 
 const runBetaHeaders = {
   'content-type': 'application/json',
@@ -49,6 +49,16 @@ async function resolveAssistantProfileId(env: Env, assistantId: string, defaultP
 
 async function resolveThreadProfileId(env: Env, threadId: string, defaultProfileId: string | undefined) {
   return (await getThreadUpstreamProfileId(env, threadId)) || defaultProfileId || null;
+}
+
+async function resolveExistingThreadProfileId(env: Env, threadId: string, config: ReturnType<typeof getRuntimeConfig>) {
+  return (await getThreadUpstreamProfileId(env, threadId))
+    || await discoverOpenAiProfileId(`/threads/${encodeURIComponent(threadId)}`, {
+      method: 'GET',
+      headers: runBetaGetHeaders
+    }, config)
+    || config.defaultUpstreamProfileId
+    || null;
 }
 
 export function createRunsRouter() {
@@ -97,7 +107,7 @@ export function createRunsRouter() {
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
 
     const threadId = c.req.param('threadId');
-    const threadProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const threadProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     const assistantProfileId = await resolveAssistantProfileId(c.env, request.assistant_id, config.defaultUpstreamProfileId);
 
     if (!threadProfileId || !assistantProfileId) {
@@ -115,6 +125,11 @@ export function createRunsRouter() {
         assistantUpstreamProfileId: assistantProfileId
       });
     }
+
+    await upsertThreadRegistry(c.env, {
+      threadId,
+      upstreamProfileId: threadProfileId
+    });
 
     return forwardOpenAiProfileUtilityRequest(
       `/threads/${encodeURIComponent(threadId)}/runs${buildQueryString(new URL(c.req.url))}`,
@@ -134,12 +149,17 @@ export function createRunsRouter() {
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
 
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (!upstreamProfileId) {
       throw new ApiError(503, 'UPSTREAM_PROFILE_NOT_FOUND', 'thread does not have a usable upstream profile', {
         threadId
       });
     }
+
+    await upsertThreadRegistry(c.env, {
+      threadId,
+      upstreamProfileId
+    });
 
     return forwardOpenAiProfileUtilityRequest(
       `/threads/${encodeURIComponent(threadId)}/runs${buildQueryString(new URL(c.req.url))}`,
@@ -158,12 +178,17 @@ export function createRunsRouter() {
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
 
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (!upstreamProfileId) {
       throw new ApiError(503, 'UPSTREAM_PROFILE_NOT_FOUND', 'thread does not have a usable upstream profile', {
         threadId
       });
     }
+
+    await upsertThreadRegistry(c.env, {
+      threadId,
+      upstreamProfileId
+    });
 
     return forwardOpenAiProfileUtilityRequest(
       `/threads/${encodeURIComponent(threadId)}/runs/${encodeURIComponent(c.req.param('runId'))}${buildQueryString(new URL(c.req.url))}`,
@@ -182,12 +207,17 @@ export function createRunsRouter() {
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
 
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (!upstreamProfileId) {
       throw new ApiError(503, 'UPSTREAM_PROFILE_NOT_FOUND', 'thread does not have a usable upstream profile', {
         threadId
       });
     }
+
+    await upsertThreadRegistry(c.env, {
+      threadId,
+      upstreamProfileId
+    });
 
     return forwardOpenAiProfileUtilityRequest(
       `/threads/${encodeURIComponent(threadId)}/runs/${encodeURIComponent(c.req.param('runId'))}/cancel`,
@@ -210,12 +240,17 @@ export function createRunsRouter() {
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
 
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (!upstreamProfileId) {
       throw new ApiError(503, 'UPSTREAM_PROFILE_NOT_FOUND', 'thread does not have a usable upstream profile', {
         threadId
       });
     }
+
+    await upsertThreadRegistry(c.env, {
+      threadId,
+      upstreamProfileId
+    });
 
     return forwardOpenAiProfileUtilityRequest(
       `/threads/${encodeURIComponent(threadId)}/runs/${encodeURIComponent(c.req.param('runId'))}/submit_tool_outputs`,
@@ -235,12 +270,17 @@ export function createRunsRouter() {
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
 
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (!upstreamProfileId) {
       throw new ApiError(503, 'UPSTREAM_PROFILE_NOT_FOUND', 'thread does not have a usable upstream profile', {
         threadId
       });
     }
+
+    await upsertThreadRegistry(c.env, {
+      threadId,
+      upstreamProfileId
+    });
 
     return forwardOpenAiProfileUtilityRequest(
       `/threads/${encodeURIComponent(threadId)}/runs/${encodeURIComponent(c.req.param('runId'))}/steps${buildQueryString(new URL(c.req.url))}`,
@@ -259,12 +299,17 @@ export function createRunsRouter() {
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
 
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (!upstreamProfileId) {
       throw new ApiError(503, 'UPSTREAM_PROFILE_NOT_FOUND', 'thread does not have a usable upstream profile', {
         threadId
       });
     }
+
+    await upsertThreadRegistry(c.env, {
+      threadId,
+      upstreamProfileId
+    });
 
     return forwardOpenAiProfileUtilityRequest(
       `/threads/${encodeURIComponent(threadId)}/runs/${encodeURIComponent(c.req.param('runId'))}/steps/${encodeURIComponent(c.req.param('stepId'))}${buildQueryString(new URL(c.req.url))}`,

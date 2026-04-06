@@ -5,7 +5,7 @@ import { ApiError } from '../lib/errors';
 import { requireRelayAccess } from '../lib/relay-auth';
 import { enforceRelayRateLimit } from '../lib/relay-rate-limit';
 import { deleteThreadRegistry, getThreadUpstreamProfileId, upsertThreadRegistry } from '../lib/thread-registry';
-import { forwardOpenAiProfileUtilityRequest, forwardOpenAiUtilityRequest } from '../lib/upstream';
+import { discoverOpenAiProfileId, forwardOpenAiProfileUtilityRequest, forwardOpenAiUtilityRequest } from '../lib/upstream';
 
 const threadBetaHeaders = {
   'content-type': 'application/json',
@@ -44,6 +44,16 @@ async function resolveThreadProfileId(env: Env, threadId: string, defaultProfile
   return (await getThreadUpstreamProfileId(env, threadId)) || defaultProfileId || null;
 }
 
+async function resolveExistingThreadProfileId(env: Env, threadId: string, config: ReturnType<typeof getRuntimeConfig>) {
+  return (await getThreadUpstreamProfileId(env, threadId))
+    || await discoverOpenAiProfileId(`/threads/${encodeURIComponent(threadId)}`, {
+      method: 'GET',
+      headers: threadBetaGetHeaders
+    }, config)
+    || config.defaultUpstreamProfileId
+    || null;
+}
+
 export function createThreadsRouter() {
   const router = new Hono<{ Bindings: Env }>();
 
@@ -75,8 +85,12 @@ export function createThreadsRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (upstreamProfileId) {
+      await upsertThreadRegistry(c.env, {
+        threadId,
+        upstreamProfileId
+      });
       return forwardOpenAiProfileUtilityRequest(`/threads/${encodeURIComponent(threadId)}`, {
         method: 'GET',
         headers: threadBetaGetHeaders
@@ -97,8 +111,12 @@ export function createThreadsRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (upstreamProfileId) {
+      await upsertThreadRegistry(c.env, {
+        threadId,
+        upstreamProfileId
+      });
       return forwardOpenAiProfileUtilityRequest(`/threads/${encodeURIComponent(threadId)}`, {
         method: 'POST',
         headers: threadBetaHeaders,
@@ -117,7 +135,7 @@ export function createThreadsRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     const response = upstreamProfileId
       ? await forwardOpenAiProfileUtilityRequest(`/threads/${encodeURIComponent(threadId)}`, {
         method: 'DELETE',
@@ -144,8 +162,12 @@ export function createThreadsRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (upstreamProfileId) {
+      await upsertThreadRegistry(c.env, {
+        threadId,
+        upstreamProfileId
+      });
       return forwardOpenAiProfileUtilityRequest(`/threads/${encodeURIComponent(threadId)}/messages`, {
         method: 'POST',
         headers: threadBetaHeaders,
@@ -164,8 +186,12 @@ export function createThreadsRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (upstreamProfileId) {
+      await upsertThreadRegistry(c.env, {
+        threadId,
+        upstreamProfileId
+      });
       return forwardOpenAiProfileUtilityRequest(
         `/threads/${encodeURIComponent(threadId)}/messages${buildQueryString(new URL(c.req.url))}`,
         {
@@ -191,8 +217,12 @@ export function createThreadsRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (upstreamProfileId) {
+      await upsertThreadRegistry(c.env, {
+        threadId,
+        upstreamProfileId
+      });
       return forwardOpenAiProfileUtilityRequest(
         `/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(c.req.param('messageId'))}`,
         {
@@ -222,8 +252,12 @@ export function createThreadsRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (upstreamProfileId) {
+      await upsertThreadRegistry(c.env, {
+        threadId,
+        upstreamProfileId
+      });
       return forwardOpenAiProfileUtilityRequest(
         `/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(c.req.param('messageId'))}`,
         {
@@ -251,8 +285,12 @@ export function createThreadsRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     const threadId = c.req.param('threadId');
-    const upstreamProfileId = await resolveThreadProfileId(c.env, threadId, config.defaultUpstreamProfileId);
+    const upstreamProfileId = await resolveExistingThreadProfileId(c.env, threadId, config);
     if (upstreamProfileId) {
+      await upsertThreadRegistry(c.env, {
+        threadId,
+        upstreamProfileId
+      });
       return forwardOpenAiProfileUtilityRequest(
         `/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(c.req.param('messageId'))}`,
         {

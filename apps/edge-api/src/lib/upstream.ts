@@ -253,6 +253,47 @@ export async function forwardOpenAiProfileUtilityRequest(
   });
 }
 
+export async function discoverOpenAiProfileId(
+  upstreamPath: string,
+  init: RequestInit,
+  config: RuntimeConfig
+): Promise<string | null> {
+  ensureUpstreamReady(config);
+
+  for (const profile of config.upstreamProfiles) {
+    const baseUrl = normalizeBaseUrl(profile.baseUrl);
+    const headers = new Headers(init.headers);
+    headers.set('authorization', `Bearer ${profile.apiKey}`);
+
+    const abortController = new AbortController();
+    const timeoutHandle = setTimeout(() => abortController.abort(), config.upstreamTimeoutMs);
+
+    try {
+      const response = await fetch(`${baseUrl}${upstreamPath}`, {
+        ...init,
+        headers,
+        signal: abortController.signal
+      });
+
+      if (response.ok) {
+        return profile.id;
+      }
+
+      if (response.status !== 404) {
+        return profile.id;
+      }
+    } catch (error) {
+      if (!(error instanceof Error && error.name === 'AbortError')) {
+        continue;
+      }
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
+  }
+
+  return null;
+}
+
 export async function forwardOpenAiModelUtilityRequest(
   env: Env,
   upstreamPath: string,

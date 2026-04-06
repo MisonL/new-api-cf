@@ -6,6 +6,7 @@ import { ApiError } from '../lib/errors';
 import { requireRelayAccess } from '../lib/relay-auth';
 import { enforceRelayRateLimit } from '../lib/relay-rate-limit';
 import {
+  discoverOpenAiProfileId,
   forwardOpenAiProfileUtilityRequest,
   forwardOpenAiUtilityRequest,
   resolveUpstreamProfileIdForModel
@@ -89,8 +90,16 @@ export function createAssistantsRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     const assistantId = c.req.param('assistantId');
-    const upstreamProfileId = await resolveAssistantProfileId(c.env, assistantId);
+    const upstreamProfileId = await resolveAssistantProfileId(c.env, assistantId)
+      || await discoverOpenAiProfileId(`/assistants/${encodeURIComponent(assistantId)}`, {
+        method: 'GET',
+        headers: listAssistantsHeaders
+      }, config);
     if (upstreamProfileId) {
+      await upsertAssistantRegistry(c.env, {
+        assistantId,
+        upstreamProfileId
+      });
       return forwardOpenAiProfileUtilityRequest(`/assistants/${encodeURIComponent(assistantId)}`, {
         method: 'GET',
         headers: listAssistantsHeaders
@@ -129,8 +138,16 @@ export function createAssistantsRouter() {
       return response;
     }
 
-    const upstreamProfileId = await resolveAssistantProfileId(c.env, assistantId);
+    const upstreamProfileId = await resolveAssistantProfileId(c.env, assistantId)
+      || await discoverOpenAiProfileId(`/assistants/${encodeURIComponent(assistantId)}`, {
+        method: 'GET',
+        headers: listAssistantsHeaders
+      }, config);
     if (upstreamProfileId) {
+      await upsertAssistantRegistry(c.env, {
+        assistantId,
+        upstreamProfileId
+      });
       return forwardOpenAiProfileUtilityRequest(`/assistants/${encodeURIComponent(assistantId)}`, {
         method: 'POST',
         headers: assistantsBetaHeaders,
@@ -150,7 +167,11 @@ export function createAssistantsRouter() {
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
     const assistantId = c.req.param('assistantId');
-    const upstreamProfileId = await resolveAssistantProfileId(c.env, assistantId);
+    const upstreamProfileId = await resolveAssistantProfileId(c.env, assistantId)
+      || await discoverOpenAiProfileId(`/assistants/${encodeURIComponent(assistantId)}`, {
+        method: 'GET',
+        headers: listAssistantsHeaders
+      }, config);
     const response = upstreamProfileId
       ? await forwardOpenAiProfileUtilityRequest(`/assistants/${encodeURIComponent(assistantId)}`, {
         method: 'DELETE',
