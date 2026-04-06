@@ -407,6 +407,118 @@ export function createMockServer(profileId, port) {
       });
     }
 
+    if (req.method === 'POST' && url.pathname === '/chat/completions') {
+      return createResponse(res, 200, {
+        id: `chatcmpl_${profileId}`,
+        object: 'chat.completion',
+        created: 1234567890,
+        model: body?.model || 'unknown',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: `chat-${profileId}`
+            },
+            finish_reason: 'stop'
+          }
+        ]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/completions') {
+      return createResponse(res, 200, {
+        id: `cmpl_${profileId}`,
+        object: 'text_completion',
+        created: 1234567890,
+        model: body?.model || 'unknown',
+        choices: [
+          {
+            index: 0,
+            text: `completion-${profileId}`,
+            finish_reason: 'stop'
+          }
+        ]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/embeddings') {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [
+          {
+            object: 'embedding',
+            index: 0,
+            embedding: [0.1, 0.2, 0.3]
+          }
+        ],
+        model: body?.model || 'unknown'
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/moderations') {
+      return createResponse(res, 200, {
+        id: `modr_${profileId}`,
+        model: body?.model || 'unknown',
+        results: [
+          {
+            flagged: false
+          }
+        ]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/audio/speech') {
+      res.writeHead(200, { 'content-type': 'audio/mpeg' });
+      res.end(`speech-${profileId}`);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/audio/transcriptions') {
+      return createResponse(res, 200, {
+        text: `transcription-${profileId}`
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/audio/translations') {
+      return createResponse(res, 200, {
+        text: `translation-${profileId}`
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/images/generations') {
+      return createResponse(res, 200, {
+        created: 1234567890,
+        data: [
+          {
+            url: `https://example.com/${profileId}.png`
+          }
+        ]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/images/edits') {
+      return createResponse(res, 200, {
+        created: 1234567890,
+        data: [
+          {
+            url: `https://example.com/edit-${profileId}.png`
+          }
+        ]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/images/variations') {
+      return createResponse(res, 200, {
+        created: 1234567890,
+        data: [
+          {
+            url: `https://example.com/variation-${profileId}.png`
+          }
+        ]
+      });
+    }
+
     return createResponse(res, 404, { error: { message: 'unhandled route', path: url.pathname } });
   });
 
