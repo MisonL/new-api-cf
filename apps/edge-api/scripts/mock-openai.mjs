@@ -223,6 +223,24 @@ export function createMockServer(profileId, port) {
       });
     }
 
+    if (req.method === 'POST' && url.pathname === '/fine_tuning/jobs/ftjob_123/pause') {
+      return createResponse(res, 200, {
+        id: 'ftjob_123',
+        object: 'fine_tuning.job',
+        status: 'paused',
+        profile: profileId
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/fine_tuning/jobs/ftjob_123/resume') {
+      return createResponse(res, 200, {
+        id: 'ftjob_123',
+        object: 'fine_tuning.job',
+        status: 'running',
+        profile: profileId
+      });
+    }
+
     return createResponse(res, 404, { error: { message: 'unhandled route', path: url.pathname } });
   });
 

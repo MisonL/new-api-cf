@@ -42,6 +42,8 @@ export function createRootRouter() {
         '/v1/fine_tuning/jobs',
         '/v1/fine_tuning/jobs/:jobId',
         '/v1/fine_tuning/jobs/:jobId/cancel',
+        '/v1/fine_tuning/jobs/:jobId/pause',
+        '/v1/fine_tuning/jobs/:jobId/resume',
         '/v1/fine_tuning/jobs/:jobId/events',
         '/v1/fine_tuning/jobs/:jobId/checkpoints',
         '/v1/fine_tuning/checkpoints/:checkpointId/permissions',

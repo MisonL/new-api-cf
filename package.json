@@ -17,6 +17,7 @@
     "check": "bun run types:edge && bun run check:shared && bun run check:edge && bun run check:web",
     "integration:assistants": "bun run --cwd apps/edge-api integration:assistants",
     "integration:realtime": "bun run --cwd apps/edge-api integration:realtime",
-    "integration:responses": "bun run --cwd apps/edge-api integration:responses"
+    "integration:responses": "bun run --cwd apps/edge-api integration:responses",
+    "integration:fine-tuning": "bun run --cwd apps/edge-api integration:fine-tuning"
   }
 }

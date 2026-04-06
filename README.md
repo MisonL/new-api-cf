@@ -69,6 +69,8 @@
   - `POST /v1/fine_tuning/jobs`
   - `GET /v1/fine_tuning/jobs/:jobId`
   - `POST /v1/fine_tuning/jobs/:jobId/cancel`
+  - `POST /v1/fine_tuning/jobs/:jobId/pause`
+  - `POST /v1/fine_tuning/jobs/:jobId/resume`
   - `GET /v1/fine_tuning/jobs/:jobId/events`
   - `GET /v1/fine_tuning/jobs/:jobId/checkpoints`
   - `GET /v1/fine_tuning/checkpoints/:checkpointId/permissions`
@@ -206,6 +208,7 @@ bun run types:edge
 bun run check
 bun run --cwd apps/edge-api d1:migrate:local
 bun run integration:assistants
+bun run integration:fine-tuning
 bun run integration:realtime
 bun run integration:responses
 ```
@@ -237,6 +240,7 @@ bun run integration:responses
 - 推荐使用 `UPSTREAM_PROFILES_JSON` + `UPSTREAM_DEFAULT_PROFILE_ID` 定义多个 upstream profile
 - `relay_models.upstream_profile_id` 负责把模型绑定到某个 profile
 - 旧的 `OPENAI_*` 单 profile 环境变量仍可继续作为兼容入口
+- `bun run integration:fine-tuning` 会启动本地 mock upstream 与本地 worker，验证 `pause` 和 `resume` 两个 fine-tuning utility 端点固定转发到默认 upstream profile
 - `AUTH_MODE=jwt` 下，管理接口通过 Bearer JWT 校验：
   - 当前要求 `HS256`
   - payload 至少满足 `role=admin` 或 `sub=admin`

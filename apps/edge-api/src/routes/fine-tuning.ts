@@ -65,6 +65,20 @@ export function createFineTuningRouter() {
     return forwardOpenAiUtilityRequest(`/fine_tuning/jobs/${encodeURIComponent(c.req.param('jobId'))}/cancel`, { method: 'POST' }, config);
   });
 
+  router.post('/v1/fine_tuning/jobs/:jobId/pause', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/fine_tuning/jobs/${encodeURIComponent(c.req.param('jobId'))}/pause`, { method: 'POST' }, config);
+  });
+
+  router.post('/v1/fine_tuning/jobs/:jobId/resume', async (c) => {
+    const config = getRuntimeConfig(c.env);
+    const access = await requireRelayAccess(c, config);
+    await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
+    return forwardOpenAiUtilityRequest(`/fine_tuning/jobs/${encodeURIComponent(c.req.param('jobId'))}/resume`, { method: 'POST' }, config);
+  });
+
   router.get('/v1/fine_tuning/jobs/:jobId/events', async (c) => {
     const config = getRuntimeConfig(c.env);
     const access = await requireRelayAccess(c, config);
