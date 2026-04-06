@@ -14,6 +14,7 @@
     "integration:responses": "node ./scripts/integration-responses.mjs",
     "integration:fine-tuning": "node ./scripts/integration-fine-tuning.mjs",
     "integration:control-plane": "node ./scripts/integration-control-plane.mjs",
+    "integration:model-cache": "node ./scripts/integration-model-cache.mjs",
     "integration:vector-stores": "node ./scripts/integration-vector-stores.mjs",
     "integration:uploads": "node ./scripts/integration-uploads.mjs",
     "integration:files": "node ./scripts/integration-files.mjs",
@@ -22,7 +23,7 @@
     "integration:threads-runs": "node ./scripts/integration-threads-runs.mjs",
     "integration:core-relay": "node ./scripts/integration-core-relay.mjs",
     "integration:conversations": "node ./scripts/integration-conversations.mjs",
-    "integration:all": "bun run integration:assistants && bun run integration:threads-runs && bun run integration:control-plane && bun run integration:state-plane && bun run integration:fine-tuning && bun run integration:realtime && bun run integration:responses && bun run integration:vector-stores && bun run integration:uploads && bun run integration:files && bun run integration:batches && bun run integration:core-relay && bun run integration:conversations"
+    "integration:all": "bun run integration:assistants && bun run integration:threads-runs && bun run integration:control-plane && bun run integration:model-cache && bun run integration:state-plane && bun run integration:fine-tuning && bun run integration:realtime && bun run integration:responses && bun run integration:vector-stores && bun run integration:uploads && bun run integration:files && bun run integration:batches && bun run integration:core-relay && bun run integration:conversations"
   },
   "dependencies": {
     "hono": "^4.12.10",
