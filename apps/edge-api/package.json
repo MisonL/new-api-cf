@@ -17,7 +17,8 @@
     "integration:uploads": "node ./scripts/integration-uploads.mjs",
     "integration:files": "node ./scripts/integration-files.mjs",
     "integration:batches": "node ./scripts/integration-batches.mjs",
-    "integration:core-relay": "node ./scripts/integration-core-relay.mjs"
+    "integration:core-relay": "node ./scripts/integration-core-relay.mjs",
+    "integration:conversations": "node ./scripts/integration-conversations.mjs"
   },
   "dependencies": {
     "hono": "^4.12.10",

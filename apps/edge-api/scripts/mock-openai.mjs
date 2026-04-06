@@ -519,6 +519,69 @@ export function createMockServer(profileId, port) {
       });
     }
 
+    if (req.method === 'POST' && url.pathname === '/conversations') {
+      return createResponse(res, 200, {
+        id: `conv_${profileId}`,
+        object: 'conversation',
+        metadata: body?.metadata || {}
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/conversations/conv_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `conv_${profileId}`,
+        object: 'conversation',
+        metadata: {
+          source: profileId
+        }
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/conversations/conv_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `conv_${profileId}`,
+        object: 'conversation',
+        metadata: body?.metadata || {}
+      });
+    }
+
+    if (req.method === 'DELETE' && url.pathname === `/conversations/conv_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `conv_${profileId}`,
+        object: 'conversation.deleted',
+        deleted: true
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/conversations/conv_${profileId}/items`) {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: `item_${profileId}`, object: 'conversation.item' }]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/conversations/conv_${profileId}/items`) {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: `item_${profileId}`, object: 'conversation.item' }]
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/conversations/conv_${profileId}/items/item_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `item_${profileId}`,
+        object: 'conversation.item'
+      });
+    }
+
+    if (req.method === 'DELETE' && url.pathname === `/conversations/conv_${profileId}/items/item_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `item_${profileId}`,
+        object: 'conversation.item.deleted',
+        deleted: true
+      });
+    }
+
     return createResponse(res, 404, { error: { message: 'unhandled route', path: url.pathname } });
   });
 

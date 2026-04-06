@@ -216,6 +216,7 @@ bun run integration:uploads
 bun run integration:files
 bun run integration:batches
 bun run integration:core-relay
+bun run integration:conversations
 ```
 
 环境变量：
@@ -251,6 +252,7 @@ bun run integration:core-relay
 - `bun run integration:files` 会启动本地 mock upstream 与本地 worker，验证 `files` 工具接口固定走默认 upstream profile，且 multipart 文件体与原始内容下载保持透传
 - `bun run integration:batches` 会启动本地 mock upstream 与本地 worker，验证 `batches` 工具接口固定走默认 upstream profile
 - `bun run integration:core-relay` 会启动本地 mock upstream 与本地 worker，验证 `audio/chat/completions/embeddings/images/moderations` 这组模型路由接口按 `model` 选择 upstream，且 multipart 与二进制响应保持透传
+- `bun run integration:conversations` 会启动本地 mock upstream 与本地 worker，验证 `conversations` 工具接口固定走默认 upstream profile，且 item CRUD 保持透传
 - `AUTH_MODE=jwt` 下，管理接口通过 Bearer JWT 校验：
   - 当前要求 `HS256`
   - payload 至少满足 `role=admin` 或 `sub=admin`
@@ -362,7 +364,17 @@ core relay 联调：
   - `chat/completions`、`completions`、`embeddings`、`moderations` 会按 `model` 路由到正确 upstream
   - `audio/speech` 会保留上游原始二进制响应与 `content-type`
   - `audio/transcriptions`、`audio/translations`、`images/edits`、`images/variations` 的 multipart 负载不会被 Worker 改写为空
-  - `images/generations`、`images/edits`、`images/variations` 会按 `model` 路由到正确 upstream
+- `images/generations`、`images/edits`、`images/variations` 会按 `model` 路由到正确 upstream
+- 脚本执行完成后会自动清理临时状态目录和本地进程
+
+conversations 工具链联调：
+
+- 运行 `bun run integration:conversations`
+- 脚本会自动启动两个本地 mock upstream 和一个本地 Worker
+- 自动验证以下行为：
+  - `POST /v1/conversations`、`GET /v1/conversations/:conversationId`、`POST /v1/conversations/:conversationId`、`DELETE /v1/conversations/:conversationId` 固定走默认 upstream profile
+  - `GET/POST/DELETE /v1/conversations/:conversationId/items*` 固定回到默认 upstream
+  - conversation 与 item 的 JSON 请求体和删除响应不会被 Worker 改写
 - 脚本执行完成后会自动清理临时状态目录和本地进程
 
 ## 目录结构
