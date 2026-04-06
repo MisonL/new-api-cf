@@ -12,7 +12,8 @@
     "integration:assistants": "node ./scripts/integration-assistants.mjs",
     "integration:realtime": "node ./scripts/integration-realtime.mjs",
     "integration:responses": "node ./scripts/integration-responses.mjs",
-    "integration:fine-tuning": "node ./scripts/integration-fine-tuning.mjs"
+    "integration:fine-tuning": "node ./scripts/integration-fine-tuning.mjs",
+    "integration:vector-stores": "node ./scripts/integration-vector-stores.mjs"
   },
   "dependencies": {
     "hono": "^4.12.10",

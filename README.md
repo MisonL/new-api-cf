@@ -211,6 +211,7 @@ bun run integration:assistants
 bun run integration:fine-tuning
 bun run integration:realtime
 bun run integration:responses
+bun run integration:vector-stores
 ```
 
 环境变量：
@@ -241,6 +242,7 @@ bun run integration:responses
 - `relay_models.upstream_profile_id` 负责把模型绑定到某个 profile
 - 旧的 `OPENAI_*` 单 profile 环境变量仍可继续作为兼容入口
 - `bun run integration:fine-tuning` 会启动本地 mock upstream 与本地 worker，验证 `pause` 和 `resume` 两个 fine-tuning utility 端点固定转发到默认 upstream profile
+- `bun run integration:vector-stores` 会启动本地 mock upstream 与本地 worker，验证 `vector stores` 工具接口固定走默认 upstream profile，且请求带 `OpenAI-Beta: assistants=v2`
 - `AUTH_MODE=jwt` 下，管理接口通过 Bearer JWT 校验：
   - 当前要求 `HS256`
   - payload 至少满足 `role=admin` 或 `sub=admin`
@@ -302,6 +304,16 @@ responses 多 upstream 联调：
   - `GET /v1/responses/:responseId` 与 `/input_items` 会按已记录 profile 回到正确 upstream
   - 既有 legacy response 首次访问时会自动发现 upstream 并回写 registry
   - `cancel` 与 `delete` 会优先走已记录或已发现的 upstream
+- 脚本执行完成后会自动清理临时状态目录和本地进程
+
+vector stores 工具链联调：
+
+- 运行 `bun run integration:vector-stores`
+- 脚本会自动启动两个本地 mock upstream 和一个本地 Worker
+- 自动验证以下行为：
+  - `POST /v1/vector_stores`、`/search`、`/files`、`/file_batches` 固定走默认 upstream profile
+  - `GET /v1/vector_stores/:vectorStoreId/file_batches/:batchId/files` 与 `POST /cancel` 固定回到默认 upstream
+  - 所有 `vector stores` 工具接口都会带 `OpenAI-Beta: assistants=v2`
 - 脚本执行完成后会自动清理临时状态目录和本地进程
 
 ## 目录结构

@@ -241,6 +241,54 @@ export function createMockServer(profileId, port) {
       });
     }
 
+    if (req.method === 'POST' && url.pathname === '/vector_stores') {
+      return createResponse(res, 200, {
+        id: `vs_${profileId}`,
+        object: 'vector_store',
+        name: body?.name || ''
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/vector_stores/vs_${profileId}/search`) {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: `chunk_${profileId}`, object: 'vector_store.search_result' }]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/vector_stores/vs_${profileId}/files`) {
+      return createResponse(res, 200, {
+        id: `vsfile_${profileId}`,
+        object: 'vector_store.file',
+        vector_store_id: `vs_${profileId}`,
+        file_id: body?.file_id || ''
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/vector_stores/vs_${profileId}/file_batches`) {
+      return createResponse(res, 200, {
+        id: `vsbatch_${profileId}`,
+        object: 'vector_store.file_batch',
+        status: 'in_progress',
+        vector_store_id: `vs_${profileId}`
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/vector_stores/vs_${profileId}/file_batches/vsbatch_${profileId}/files`) {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: `vsfile_${profileId}`, object: 'vector_store.file' }]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/vector_stores/vs_${profileId}/file_batches/vsbatch_${profileId}/cancel`) {
+      return createResponse(res, 200, {
+        id: `vsbatch_${profileId}`,
+        object: 'vector_store.file_batch',
+        status: 'cancelled'
+      });
+    }
+
     return createResponse(res, 404, { error: { message: 'unhandled route', path: url.pathname } });
   });
 
