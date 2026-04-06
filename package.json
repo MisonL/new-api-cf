@@ -23,6 +23,7 @@
     "integration:uploads": "bun run --cwd apps/edge-api integration:uploads",
     "integration:files": "bun run --cwd apps/edge-api integration:files",
     "integration:batches": "bun run --cwd apps/edge-api integration:batches",
+    "integration:threads-runs": "bun run --cwd apps/edge-api integration:threads-runs",
     "integration:core-relay": "bun run --cwd apps/edge-api integration:core-relay",
     "integration:conversations": "bun run --cwd apps/edge-api integration:conversations",
     "integration:all": "bun run --cwd apps/edge-api integration:all"

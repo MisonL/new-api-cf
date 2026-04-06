@@ -27,6 +27,7 @@ export function createMockServer(profileId, port) {
       profileId,
       method: req.method || 'GET',
       path: url.pathname,
+      search: url.search,
       body,
       rawBody,
       contentType: String(contentType),
@@ -64,18 +65,144 @@ export function createMockServer(profileId, port) {
       return createResponse(res, 200, { id, object: 'thread' });
     }
 
-    if (req.method === 'GET' && url.pathname.startsWith('/threads/')) {
+    if (url.pathname.startsWith('/threads/') && url.pathname !== '/threads/runs') {
       const parts = url.pathname.split('/').filter(Boolean);
       const threadId = parts[1];
-      if (parts.length === 2) {
-        if (threadId === 'thread_primary' && profileId === 'primary') {
-          return createResponse(res, 200, { id: threadId, object: 'thread' });
-        }
-        if (threadId === 'thread_secondary' && profileId === 'secondary') {
-          return createResponse(res, 200, { id: threadId, object: 'thread' });
-        }
+      const threadProfileId = threadId === 'thread_primary'
+        ? 'primary'
+        : (threadId === 'thread_secondary' || threadId === 'thread_legacy' ? 'secondary' : null);
+      const threadSuffix = threadId === 'thread_primary'
+        ? 'primary'
+        : (threadId === 'thread_secondary' ? 'secondary' : (threadId === 'thread_legacy' ? 'legacy' : null));
+      if (!threadProfileId || threadProfileId !== profileId) {
         return createResponse(res, 404, { error: { message: 'not found' } });
       }
+
+      if (parts.length === 2 && req.method === 'GET') {
+        return createResponse(res, 200, { id: threadId, object: 'thread' });
+      }
+
+      if (parts.length === 2 && req.method === 'POST') {
+        return createResponse(res, 200, {
+          id: threadId,
+          object: 'thread',
+          metadata: body?.metadata || {}
+        });
+      }
+
+      if (parts.length === 2 && req.method === 'DELETE') {
+        return createResponse(res, 200, {
+          id: threadId,
+          object: 'thread.deleted',
+          deleted: true
+        });
+      }
+
+      if (parts[2] === 'messages') {
+        const messageId = `msg_${threadSuffix}`;
+        if (parts.length === 3 && req.method === 'GET') {
+          return createResponse(res, 200, {
+            object: 'list',
+            data: [{ id: messageId, object: 'thread.message', thread_id: threadId }]
+          });
+        }
+        if (parts.length === 3 && req.method === 'POST') {
+          return createResponse(res, 200, {
+            id: messageId,
+            object: 'thread.message',
+            thread_id: threadId,
+            role: body?.role || 'user',
+            content: body?.content || []
+          });
+        }
+        if (parts.length === 4 && parts[3] === messageId && req.method === 'GET') {
+          return createResponse(res, 200, {
+            id: messageId,
+            object: 'thread.message',
+            thread_id: threadId,
+            role: 'user',
+            content: [{ type: 'text', text: { value: `message-${threadSuffix}` } }]
+          });
+        }
+        if (parts.length === 4 && parts[3] === messageId && req.method === 'POST') {
+          return createResponse(res, 200, {
+            id: messageId,
+            object: 'thread.message',
+            thread_id: threadId,
+            metadata: body?.metadata || {}
+          });
+        }
+        if (parts.length === 4 && parts[3] === messageId && req.method === 'DELETE') {
+          return createResponse(res, 200, {
+            id: messageId,
+            object: 'thread.message.deleted',
+            deleted: true
+          });
+        }
+      }
+
+      if (parts[2] === 'runs') {
+        const runId = threadId === 'thread_secondary' ? 'run_secondary_followup' : `run_${threadSuffix}`;
+        const stepId = `step_${threadSuffix}`;
+        const assistantId = profileId === 'secondary' ? 'asst_secondary' : 'asst_primary';
+
+        if (parts.length === 3 && req.method === 'POST') {
+          return createResponse(res, 200, {
+            id: runId,
+            object: 'thread.run',
+            assistant_id: body?.assistant_id || assistantId,
+            thread_id: threadId,
+            status: 'queued'
+          });
+        }
+        if (parts.length === 3 && req.method === 'GET') {
+          return createResponse(res, 200, {
+            object: 'list',
+            data: [{ id: runId, object: 'thread.run', thread_id: threadId }]
+          });
+        }
+        if (parts.length === 4 && parts[3] === runId && req.method === 'GET') {
+          return createResponse(res, 200, {
+            id: runId,
+            object: 'thread.run',
+            assistant_id: assistantId,
+            thread_id: threadId,
+            status: 'queued'
+          });
+        }
+        if (parts.length === 5 && parts[3] === runId && parts[4] === 'cancel' && req.method === 'POST') {
+          return createResponse(res, 200, {
+            id: runId,
+            object: 'thread.run',
+            thread_id: threadId,
+            status: 'cancelling'
+          });
+        }
+        if (parts.length === 5 && parts[3] === runId && parts[4] === 'submit_tool_outputs' && req.method === 'POST') {
+          return createResponse(res, 200, {
+            id: runId,
+            object: 'thread.run',
+            thread_id: threadId,
+            status: 'queued'
+          });
+        }
+        if (parts.length === 5 && parts[3] === runId && parts[4] === 'steps' && req.method === 'GET') {
+          return createResponse(res, 200, {
+            object: 'list',
+            data: [{ id: stepId, object: 'thread.run.step', run_id: runId }]
+          });
+        }
+        if (parts.length === 6 && parts[3] === runId && parts[4] === 'steps' && parts[5] === stepId && req.method === 'GET') {
+          return createResponse(res, 200, {
+            id: stepId,
+            object: 'thread.run.step',
+            run_id: runId,
+            type: 'tool_calls'
+          });
+        }
+      }
+
+      return createResponse(res, 404, { error: { message: 'not found' } });
     }
 
     if (req.method === 'POST' && url.pathname === '/threads/runs') {
@@ -90,16 +217,6 @@ export function createMockServer(profileId, port) {
         });
       }
       return createResponse(res, 404, { error: { message: 'not found' } });
-    }
-
-    if (req.method === 'POST' && url.pathname === '/threads/thread_secondary/runs' && profileId === 'secondary') {
-      return createResponse(res, 200, {
-        id: 'run_secondary_followup',
-        object: 'thread.run',
-        assistant_id: body?.assistant_id || 'asst_secondary',
-        thread_id: 'thread_secondary',
-        status: 'queued'
-      });
     }
 
     if (req.method === 'POST' && url.pathname === '/realtime/sessions') {
