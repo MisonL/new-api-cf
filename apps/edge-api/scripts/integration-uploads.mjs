@@ -147,12 +147,16 @@ try {
       bytes: 11,
       filename: 'hello.txt',
       mime_type: 'text/plain',
-      purpose: 'assistants'
+      purpose: 'assistants',
+      expires_after: {
+        anchor: 'created_at',
+        seconds: 300
+      }
     })
   });
   assert(createUpload.response.ok, 'upload creation should succeed');
   assert(createUpload.json.id === 'upload_primary', 'upload should be created on default upstream');
-  assert(countHits(primary, (hit) => hit.path === '/uploads') === 1, 'upload creation should hit primary');
+  assert(countHits(primary, (hit) => hit.path === '/uploads' && hit.body?.expires_after?.seconds === 300 && hit.body?.purpose === 'assistants') === 1, 'upload creation should preserve JSON payload and hit primary');
   assert(countHits(secondary, (hit) => hit.path === '/uploads') === 0, 'upload creation should not hit secondary');
 
   primary.clear();
@@ -161,6 +165,14 @@ try {
   const uploadInfo = await request('/v1/uploads/upload_primary');
   assert(uploadInfo.response.ok, 'upload detail should succeed');
   assert(countHits(primary, (hit) => hit.path === '/uploads/upload_primary') === 1, 'upload detail should hit primary');
+
+  primary.clear();
+  secondary.clear();
+
+  const listParts = await request('/v1/uploads/upload_primary/parts?limit=2');
+  assert(listParts.response.ok, 'upload part list should succeed');
+  assert(Array.isArray(listParts.json.data), 'upload part list should return list data');
+  assert(countHits(primary, (hit) => hit.path === '/uploads/upload_primary/parts' && hit.method === 'GET' && hit.search === '?limit=2') === 1, 'upload part list should preserve query string on primary');
 
   primary.clear();
   secondary.clear();
@@ -187,11 +199,14 @@ try {
 
   const completeUpload = await request('/v1/uploads/upload_primary/complete', {
     method: 'POST',
-    body: JSON.stringify({ part_ids: ['part_primary'] })
+    body: JSON.stringify({
+      part_ids: ['part_primary'],
+      md5: '8ddd8be4b179a529afa5f2ffae4b9858'
+    })
   });
   assert(completeUpload.response.ok, 'upload complete should succeed');
   assert(completeUpload.json.status === 'completed', 'upload complete should return completed status');
-  assert(countHits(primary, (hit) => hit.path === '/uploads/upload_primary/complete') === 1, 'upload complete should hit primary');
+  assert(countHits(primary, (hit) => hit.path === '/uploads/upload_primary/complete' && hit.body?.md5 === '8ddd8be4b179a529afa5f2ffae4b9858' && Array.isArray(hit.body?.part_ids)) === 1, 'upload complete should preserve JSON payload and hit primary');
 
   primary.clear();
   secondary.clear();
@@ -206,7 +221,8 @@ try {
     ok: true,
     verified: [
       'upload utility routes use default upstream profile',
-      'upload part preserves multipart payload',
+      'upload create and complete preserve JSON payloads',
+      'upload part routes preserve multipart payload and query string',
       'upload complete and cancel stay on default upstream'
     ]
   }, null, 2));

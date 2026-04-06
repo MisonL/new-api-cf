@@ -610,6 +610,17 @@ export function createMockServer(profileId, port) {
       });
     }
 
+    if (req.method === 'GET' && url.pathname === `/uploads/upload_${profileId}/parts`) {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{
+          id: `part_${profileId}`,
+          object: 'upload.part',
+          upload_id: `upload_${profileId}`
+        }]
+      });
+    }
+
     if (req.method === 'POST' && url.pathname === `/uploads/upload_${profileId}/parts`) {
       return createResponse(res, 200, {
         id: `part_${profileId}`,
