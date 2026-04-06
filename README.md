@@ -252,6 +252,7 @@ bun run integration:all
 - `bun run integration:fine-tuning` 会启动本地 mock upstream 与本地 worker，验证 `jobs/create/detail/cancel/pause/resume/events/checkpoints/permissions` 这组 fine-tuning utility 端点固定转发到默认 upstream profile，且 query string 与 JSON 请求体保持透传
 - `bun run integration:control-plane` 会启动本地 worker，验证 `status/auth/admin/models/token` 这组控制面接口在 session 模式下的登录、bootstrap、模型启停、usage 参数校验和 token 生命周期
 - `bun run integration:jwt-auth` 会启动一个 `AUTH_MODE=jwt` 的本地 worker，验证 `HS256 + exp + issuer/audience + admin identity` 这些约束都真实生效，且有效 JWT 可以访问管理面和 relay 模型目录
+- `bun run integration:legacy-config` 会启动一个只配置 `OPENAI_*` 环境变量的本地 worker，验证旧的单 profile 兼容入口仍可 bootstrap 模型目录并驱动 relay
 - `bun run integration:model-cache` 会启动一个带 KV 绑定的本地 worker，验证 `MODEL_CATALOG_CACHE` 已真实接线：bootstrap / 模型更新会刷新快照，`relay_models` 被清空后 `/api/models` 和 relay 仍可继续使用缓存目录
 - `bun run integration:state-plane` 会启动一个带 Queue / Durable Object 绑定的本地 worker，验证状态面能力已经真实接线：`status` 暴露绑定状态、usage 经 Queue 聚合回 D1、Relay 速率门禁经 Durable Object 生效
 - `bun run integration:assistants` 会启动本地 mock upstream 与本地 worker，验证 `assistants` 的 list/create/detail/update/delete 以及 `threads/runs` 关联助手的路由归属、beta header、query string 和 legacy 自动探测缓存
@@ -398,7 +399,17 @@ jwt auth 联调：
   - `GET /api/status` 与 `GET /api/auth/session` 会正确暴露 jwt 模式状态
   - `POST /api/auth/login` 在 jwt 模式下显式返回 `LOGIN_NOT_AVAILABLE`
   - JWT 校验会同时约束 `HS256`、`exp`、`issuer`、`audience` 和 `role=admin` / `sub=admin`
-  - 合法 admin JWT 可访问 `/api/admin/*` 与 `/v1/models*`
+- 合法 admin JWT 可访问 `/api/admin/*` 与 `/v1/models*`
+- 脚本执行完成后会自动清理临时状态目录和本地进程
+
+legacy config 联调：
+
+- 运行 `bun run integration:legacy-config`
+- 脚本会自动启动一个只配置 `OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL_ALLOWLIST` 的本地 Worker
+- 自动验证以下行为：
+  - 未配置 `UPSTREAM_PROFILES_JSON` 时，旧的 `OPENAI_*` 兼容入口仍会构造默认 upstream profile
+  - `/api/admin/bootstrap` 仍可把 legacy model allowlist 写入 D1 控制面目录
+  - `/api/models` 与核心 relay 仍可使用 legacy upstream 正常工作
 - 脚本执行完成后会自动清理临时状态目录和本地进程
 
 state plane 联调：
@@ -429,6 +440,7 @@ conversations 工具链联调：
   - `threads-runs`
   - `control-plane`
   - `jwt-auth`
+  - `legacy-config`
   - `model-cache`
   - `state-plane`
   - `fine-tuning`
