@@ -141,10 +141,11 @@ try {
 
   await waitForWorker(`http://127.0.0.1:${EDGE_PORT}/api/status`);
 
-  const listBatches = await request('/v1/batches');
+  const listBatches = await request('/v1/batches?limit=1');
   assert(listBatches.response.ok, 'batch list should succeed');
   assert(Array.isArray(listBatches.json.data), 'batch list should return list data');
-  assert(countHits(primary, (hit) => hit.path === '/batches' && hit.method === 'GET') === 1, 'batch list should hit primary');
+  assert(listBatches.json.data[0]?.endpoint === '/v1/responses', 'batch list should preserve upstream payload');
+  assert(countHits(primary, (hit) => hit.path === '/batches' && hit.method === 'GET' && hit.search === '?limit=1') === 1, 'batch list should preserve query string on primary');
   assert(countHits(secondary, (hit) => hit.path === '/batches') === 0, 'batch list should not hit secondary');
 
   primary.clear();
@@ -155,18 +156,24 @@ try {
     body: JSON.stringify({
       input_file_id: 'file_primary',
       endpoint: '/v1/responses',
-      completion_window: '24h'
+      completion_window: '24h',
+      metadata: {
+        scope: 'integration'
+      }
     })
   });
   assert(createBatch.response.ok, 'batch create should succeed');
   assert(createBatch.json.id === 'batch_primary', 'batch create should use default upstream');
-  assert(countHits(primary, (hit) => hit.path === '/batches' && hit.method === 'POST') === 1, 'batch create should hit primary');
+  assert(createBatch.json.metadata.scope === 'integration', 'batch create should preserve JSON payload');
+  assert(countHits(primary, (hit) => hit.path === '/batches' && hit.method === 'POST' && hit.body?.metadata?.scope === 'integration' && hit.body?.completion_window === '24h') === 1, 'batch create should preserve JSON payload on primary');
 
   primary.clear();
   secondary.clear();
 
   const batchInfo = await request('/v1/batches/batch_primary');
   assert(batchInfo.response.ok, 'batch detail should succeed');
+  assert(batchInfo.json.metadata.source === 'primary', 'batch detail should preserve upstream metadata');
+  assert(batchInfo.json.endpoint === '/v1/responses', 'batch detail should preserve upstream scalar fields');
   assert(countHits(primary, (hit) => hit.path === '/batches/batch_primary') === 1, 'batch detail should hit primary');
 
   primary.clear();
@@ -182,6 +189,7 @@ try {
     ok: true,
     verified: [
       'batch utility routes use default upstream profile',
+      'batch list and detail preserve query string and upstream payloads',
       'batch create preserves JSON payload shape',
       'batch detail and cancel stay on default upstream'
     ]

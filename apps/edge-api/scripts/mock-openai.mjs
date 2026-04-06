@@ -702,7 +702,12 @@ export function createMockServer(profileId, port) {
     if (req.method === 'GET' && url.pathname === '/batches') {
       return createResponse(res, 200, {
         object: 'list',
-        data: [{ id: `batch_${profileId}`, object: 'batch' }]
+        data: [{
+          id: `batch_${profileId}`,
+          object: 'batch',
+          endpoint: '/v1/responses',
+          status: 'validating'
+        }]
       });
     }
 
@@ -710,7 +715,9 @@ export function createMockServer(profileId, port) {
       return createResponse(res, 200, {
         id: `batch_${profileId}`,
         object: 'batch',
-        status: 'validating'
+        status: 'validating',
+        endpoint: body?.endpoint || '/v1/responses',
+        metadata: body?.metadata || {}
       });
     }
 
@@ -718,7 +725,11 @@ export function createMockServer(profileId, port) {
       return createResponse(res, 200, {
         id: `batch_${profileId}`,
         object: 'batch',
-        status: 'validating'
+        status: 'validating',
+        endpoint: '/v1/responses',
+        metadata: {
+          source: profileId
+        }
       });
     }
 

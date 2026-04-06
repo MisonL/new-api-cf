@@ -254,7 +254,7 @@ bun run integration:all
 - `bun run integration:vector-stores` 会启动本地 mock upstream 与本地 worker，验证 `vector_stores` 的 list/detail/update/delete、files、file_batches、search 这组工具接口固定走默认 upstream profile，请求保持 `OpenAI-Beta: assistants=v2`，且 query string、JSON 请求体与原始文件内容透传正常
 - `bun run integration:uploads` 会启动本地 mock upstream 与本地 worker，验证 `uploads` 的 create/detail/parts/list/complete/cancel 这组工具接口固定走默认 upstream profile，且 query string、JSON 请求体与 multipart 分片内容透传正常
 - `bun run integration:files` 会启动本地 mock upstream 与本地 worker，验证 `files` 的 list/detail/create/delete/content 这组工具接口固定走默认 upstream profile，且 query string、上游载荷与原始内容下载保持透传
-- `bun run integration:batches` 会启动本地 mock upstream 与本地 worker，验证 `batches` 工具接口固定走默认 upstream profile
+- `bun run integration:batches` 会启动本地 mock upstream 与本地 worker，验证 `batches` 的 list/create/detail/cancel 这组工具接口固定走默认 upstream profile，且 query string 与 JSON 请求体透传正常
 - `bun run integration:threads-runs` 会启动本地 mock upstream 与本地 worker，验证 `threads/messages/runs` 在多 upstream 场景下保持 registry 归属、query string 透传和 legacy thread 自动探测缓存
 - `bun run integration:core-relay` 会启动本地 mock upstream 与本地 worker，验证 `audio/chat/completions/embeddings/images/moderations` 这组模型路由接口按 `model` 选择 upstream，且 multipart 与二进制响应保持透传
 - `bun run integration:conversations` 会启动本地 mock upstream 与本地 worker，验证 `conversations` 工具接口固定走默认 upstream profile，且 item CRUD 保持透传
