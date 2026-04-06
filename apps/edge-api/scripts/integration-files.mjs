@@ -159,16 +159,19 @@ try {
   primary.clear();
   secondary.clear();
 
-  const listFiles = await request('/v1/files');
+  const listFiles = await request('/v1/files?purpose=assistants&limit=1');
   assert(listFiles.response.ok, 'file list should succeed');
   assert(Array.isArray(listFiles.json.data), 'file list should return list data');
-  assert(countHits(primary, (hit) => hit.path === '/files' && hit.method === 'GET') === 1, 'file list should hit primary');
+  assert(listFiles.json.data[0]?.filename === 'file-primary.txt', 'file list should preserve upstream payload');
+  assert(countHits(primary, (hit) => hit.path === '/files' && hit.method === 'GET' && hit.search === '?purpose=assistants&limit=1') === 1, 'file list should preserve query string on primary');
 
   primary.clear();
   secondary.clear();
 
   const fileInfo = await request('/v1/files/file_primary');
   assert(fileInfo.response.ok, 'file detail should succeed');
+  assert(fileInfo.json.metadata.source === 'primary', 'file detail should preserve upstream metadata');
+  assert(fileInfo.json.bytes === 11, 'file detail should preserve upstream scalar fields');
   assert(countHits(primary, (hit) => hit.path === '/files/file_primary') === 1, 'file detail should hit primary');
 
   primary.clear();
@@ -192,6 +195,7 @@ try {
     ok: true,
     verified: [
       'file utility routes use default upstream profile',
+      'file list and detail preserve query string and upstream payloads',
       'file upload preserves multipart payload',
       'file content passthrough keeps raw upstream response'
     ]

@@ -664,7 +664,12 @@ export function createMockServer(profileId, port) {
     if (req.method === 'GET' && url.pathname === '/files') {
       return createResponse(res, 200, {
         object: 'list',
-        data: [{ id: `file_${profileId}`, object: 'file' }]
+        data: [{
+          id: `file_${profileId}`,
+          object: 'file',
+          purpose: 'assistants',
+          filename: `file-${profileId}.txt`
+        }]
       });
     }
 
@@ -672,7 +677,11 @@ export function createMockServer(profileId, port) {
       return createResponse(res, 200, {
         id: `file_${profileId}`,
         object: 'file',
-        purpose: 'assistants'
+        purpose: 'assistants',
+        bytes: 11,
+        metadata: {
+          source: profileId
+        }
       });
     }
 
