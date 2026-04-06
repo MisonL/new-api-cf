@@ -137,6 +137,76 @@ export function createMockServer(profileId, port) {
       return createResponse(res, 200, { rejected: true, profile: profileId, status_code: body?.status_code || 603 });
     }
 
+    if (req.method === 'POST' && url.pathname === '/responses') {
+      return createResponse(res, 200, {
+        id: `resp_${profileId}`,
+        object: 'response',
+        model: body?.model || 'unknown'
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/responses/resp_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `resp_${profileId}`,
+        object: 'response',
+        model: `${profileId}-model`
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === '/responses/resp_legacy' && profileId === 'secondary') {
+      return createResponse(res, 200, {
+        id: 'resp_legacy',
+        object: 'response',
+        model: 'secondary-model'
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/responses/resp_${profileId}/input_items`) {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: `item_${profileId}`, object: 'response.input_item' }]
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === '/responses/resp_legacy/input_items' && profileId === 'secondary') {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: 'item_legacy', object: 'response.input_item' }]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/responses/resp_${profileId}/cancel`) {
+      return createResponse(res, 200, {
+        id: `resp_${profileId}`,
+        object: 'response',
+        status: 'cancelled'
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/responses/resp_legacy/cancel' && profileId === 'secondary') {
+      return createResponse(res, 200, {
+        id: 'resp_legacy',
+        object: 'response',
+        status: 'cancelled'
+      });
+    }
+
+    if (req.method === 'DELETE' && url.pathname === `/responses/resp_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `resp_${profileId}`,
+        object: 'response.deleted',
+        deleted: true
+      });
+    }
+
+    if (req.method === 'DELETE' && url.pathname === '/responses/resp_legacy' && profileId === 'secondary') {
+      return createResponse(res, 200, {
+        id: 'resp_legacy',
+        object: 'response.deleted',
+        deleted: true
+      });
+    }
+
     return createResponse(res, 404, { error: { message: 'unhandled route', path: url.pathname } });
   });
 

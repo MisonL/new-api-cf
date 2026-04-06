@@ -10,7 +10,8 @@
     "d1:seed:local": "wrangler d1 execute DB --local --file ./migrations/0001_initial_control_plane.sql",
     "check": "tsc --noEmit",
     "integration:assistants": "node ./scripts/integration-assistants.mjs",
-    "integration:realtime": "node ./scripts/integration-realtime.mjs"
+    "integration:realtime": "node ./scripts/integration-realtime.mjs",
+    "integration:responses": "node ./scripts/integration-responses.mjs"
   },
   "dependencies": {
     "hono": "^4.12.10",

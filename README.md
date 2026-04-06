@@ -162,6 +162,7 @@
   - `api_tokens`
   - `relay_assistants`
   - `relay_threads`
+  - `relay_responses`
   - `relay_realtime_calls`
   - `usage_daily`
 - 若绑定 `MODEL_CATALOG_CACHE`，Worker 会把“启用中的模型目录快照”写入 KV：
@@ -186,12 +187,13 @@
   - 或 D1 API token
 - `files`、`batches`、`fine_tuning/jobs`、`vector_stores`、`uploads` 和 `conversations` 相关接口当前固定走默认 upstream profile，不参与模型目录校验；`realtime/client_secrets`、`realtime/calls` 与 `realtime/transcription_sessions` 会按请求体中的模型字段走模型目录与 upstream profile 映射
 - `GET /v1/models/:model` 直接基于本地模型目录返回单模型详情，不再额外请求上游
+- `responses` 在创建成功后，会把 `response_id -> upstream_profile_id` 映射写入 D1；后续 `GET/DELETE/cancel/input_items` 会优先按该映射回到正确上游
 - `assistants` 在创建或带 `model` 更新后，会把 `assistant_id -> upstream_profile_id` 映射写入 D1；后续 `GET/POST/DELETE /v1/assistants/:assistantId` 会优先按该映射回到正确上游，避免多 profile 场景下打错 provider
 - `threads` 在创建或 `threads/runs` 返回新 thread 后，也会把 `thread_id -> upstream_profile_id` 映射写入 D1；后续 messages 和 runs 相关接口会优先按该映射回到正确上游
 - `runs` 当前按 assistant / thread 映射选择 upstream profile；若 `POST /v1/threads/:threadId/runs` 中 thread 与 assistant 归属的 profile 不一致，会显式返回 `THREAD_ASSISTANT_PROFILE_MISMATCH`
 - `realtime/sessions` 会按请求体中的 `model` 选择 upstream profile；`realtime/calls` 在创建成功后会把 `call_id -> upstream_profile_id` 映射写入 D1，并保留上游 `Location` 响应头
 - `realtime/calls/:callId/hangup|refer|reject` 当前要求本地已存在该 call 的 upstream 归属；若未知，会显式返回 `REALTIME_CALL_PROFILE_UNKNOWN`，不做静默默认路由
-- 若本地尚未记录某个既有 assistant 或 thread 的 profile 归属，Worker 会先对各 upstream 做一次只读探测；找到命中的 profile 后会立刻回写本地 registry，后续请求不再重复探测
+- 若本地尚未记录某个既有 assistant、thread 或 response 的 profile 归属，Worker 会先对各 upstream 做一次只读探测；找到命中的 profile 后会立刻回写本地 registry，后续请求不再重复探测
 - 当前已接入 D1，KV / Durable Objects / Queues 仍未接入
 
 ## 开发命令
@@ -203,6 +205,7 @@ bun run check
 bun run --cwd apps/edge-api d1:migrate:local
 bun run integration:assistants
 bun run integration:realtime
+bun run integration:responses
 ```
 
 环境变量：
@@ -278,7 +281,18 @@ realtime + model detail 联调：
   - `POST /v1/realtime/sessions` 按 `model` 路由到正确 upstream
   - `POST /v1/realtime/calls` 保留上游 `Location` 响应头，并写入 `call_id -> upstream_profile_id`
   - `POST /v1/realtime/calls/:callId/*` 通过本地 registry 回到正确 upstream
-  - 未知 `call_id` 会显式返回 `REALTIME_CALL_PROFILE_UNKNOWN`
+- 未知 `call_id` 会显式返回 `REALTIME_CALL_PROFILE_UNKNOWN`
+- 脚本执行完成后会自动清理临时状态目录和本地进程
+
+responses 多 upstream 联调：
+
+- 运行 `bun run integration:responses`
+- 脚本会自动启动两个本地 mock upstream 和一个本地 Worker
+- 自动验证以下行为：
+  - `POST /v1/responses` 创建后会持久化 `response_id -> upstream_profile_id`
+  - `GET /v1/responses/:responseId` 与 `/input_items` 会按已记录 profile 回到正确 upstream
+  - 既有 legacy response 首次访问时会自动发现 upstream 并回写 registry
+  - `cancel` 与 `delete` 会优先走已记录或已发现的 upstream
 - 脚本执行完成后会自动清理临时状态目录和本地进程
 
 ## 目录结构

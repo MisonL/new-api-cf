@@ -4,7 +4,8 @@ import { getRuntimeConfig } from '../lib/config';
 import { ApiError } from '../lib/errors';
 import { requireRelayAccess } from '../lib/relay-auth';
 import { enforceRelayRateLimit } from '../lib/relay-rate-limit';
-import { forwardOpenAiModelUtilityRequest, forwardOpenAiUtilityRequest, forwardResponseCreate } from '../lib/upstream';
+import { deleteResponseRegistry, getResponseUpstreamProfileId, upsertResponseRegistry } from '../lib/response-registry';
+import { discoverOpenAiProfileId, forwardOpenAiModelUtilityRequest, forwardOpenAiProfileUtilityRequest, forwardOpenAiUtilityRequest, forwardResponseCreate, resolveUpstreamProfileIdForModel } from '../lib/upstream';
 import { responseCreateRequestSchema } from '../schemas/responses';
 
 const responseInputTokensRequestSchema = z.object({
@@ -19,6 +20,23 @@ function buildQueryString(url: URL) {
   return url.search ? url.search : '';
 }
 
+async function readResponseId(response: Response): Promise<string | null> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return null;
+  }
+
+  const payload = await response.clone().json().catch(() => null) as { id?: unknown } | null;
+  return typeof payload?.id === 'string' ? payload.id : null;
+}
+
+async function resolveResponseProfileId(env: Env, responseId: string, config: ReturnType<typeof getRuntimeConfig>) {
+  return (await getResponseUpstreamProfileId(env, responseId))
+    || await discoverOpenAiProfileId(`/responses/${encodeURIComponent(responseId)}`, { method: 'GET' }, config)
+    || config.defaultUpstreamProfileId
+    || null;
+}
+
 export function createResponsesRouter() {
   const router = new Hono<{ Bindings: Env }>();
 
@@ -30,7 +48,17 @@ export function createResponsesRouter() {
     const config = getRuntimeConfig(c.env);
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
-    return forwardResponseCreate(c.env, request, config, access);
+    const upstreamProfileId = await resolveUpstreamProfileIdForModel(c.env, request.model, config);
+    const response = await forwardResponseCreate(c.env, request, config, access);
+    const responseId = await readResponseId(response);
+    if (response.ok && responseId) {
+      await upsertResponseRegistry(c.env, {
+        responseId,
+        upstreamProfileId,
+        model: request.model
+      });
+    }
+    return response;
   });
 
   router.post('/v1/responses/input_tokens', async (c) => {
@@ -82,28 +110,63 @@ export function createResponsesRouter() {
     const config = getRuntimeConfig(c.env);
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
-    return forwardOpenAiUtilityRequest(`/responses/${encodeURIComponent(c.req.param('responseId'))}${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
+    const responseId = c.req.param('responseId');
+    const upstreamProfileId = await resolveResponseProfileId(c.env, responseId, config);
+    if (upstreamProfileId) {
+      await upsertResponseRegistry(c.env, {
+        responseId,
+        upstreamProfileId
+      });
+      return forwardOpenAiProfileUtilityRequest(`/responses/${encodeURIComponent(responseId)}${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config, upstreamProfileId);
+    }
+    return forwardOpenAiUtilityRequest(`/responses/${encodeURIComponent(responseId)}${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
   });
 
   router.delete('/v1/responses/:responseId', async (c) => {
     const config = getRuntimeConfig(c.env);
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
-    return forwardOpenAiUtilityRequest(`/responses/${encodeURIComponent(c.req.param('responseId'))}`, { method: 'DELETE' }, config);
+    const responseId = c.req.param('responseId');
+    const upstreamProfileId = await resolveResponseProfileId(c.env, responseId, config);
+    const response = upstreamProfileId
+      ? await forwardOpenAiProfileUtilityRequest(`/responses/${encodeURIComponent(responseId)}`, { method: 'DELETE' }, config, upstreamProfileId)
+      : await forwardOpenAiUtilityRequest(`/responses/${encodeURIComponent(responseId)}`, { method: 'DELETE' }, config);
+    if (response.ok) {
+      await deleteResponseRegistry(c.env, responseId);
+    }
+    return response;
   });
 
   router.post('/v1/responses/:responseId/cancel', async (c) => {
     const config = getRuntimeConfig(c.env);
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
-    return forwardOpenAiUtilityRequest(`/responses/${encodeURIComponent(c.req.param('responseId'))}/cancel`, { method: 'POST' }, config);
+    const responseId = c.req.param('responseId');
+    const upstreamProfileId = await resolveResponseProfileId(c.env, responseId, config);
+    if (upstreamProfileId) {
+      await upsertResponseRegistry(c.env, {
+        responseId,
+        upstreamProfileId
+      });
+      return forwardOpenAiProfileUtilityRequest(`/responses/${encodeURIComponent(responseId)}/cancel`, { method: 'POST' }, config, upstreamProfileId);
+    }
+    return forwardOpenAiUtilityRequest(`/responses/${encodeURIComponent(responseId)}/cancel`, { method: 'POST' }, config);
   });
 
   router.get('/v1/responses/:responseId/input_items', async (c) => {
     const config = getRuntimeConfig(c.env);
     const access = await requireRelayAccess(c, config);
     await enforceRelayRateLimit(c.env, access, config.relayRateLimitPerMinute);
-    return forwardOpenAiUtilityRequest(`/responses/${encodeURIComponent(c.req.param('responseId'))}/input_items${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
+    const responseId = c.req.param('responseId');
+    const upstreamProfileId = await resolveResponseProfileId(c.env, responseId, config);
+    if (upstreamProfileId) {
+      await upsertResponseRegistry(c.env, {
+        responseId,
+        upstreamProfileId
+      });
+      return forwardOpenAiProfileUtilityRequest(`/responses/${encodeURIComponent(responseId)}/input_items${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config, upstreamProfileId);
+    }
+    return forwardOpenAiUtilityRequest(`/responses/${encodeURIComponent(responseId)}/input_items${buildQueryString(new URL(c.req.url))}`, { method: 'GET' }, config);
   });
 
   return router;
