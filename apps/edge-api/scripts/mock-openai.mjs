@@ -376,6 +376,37 @@ export function createMockServer(profileId, port) {
       });
     }
 
+    if (req.method === 'GET' && url.pathname === '/batches') {
+      return createResponse(res, 200, {
+        object: 'list',
+        data: [{ id: `batch_${profileId}`, object: 'batch' }]
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/batches') {
+      return createResponse(res, 200, {
+        id: `batch_${profileId}`,
+        object: 'batch',
+        status: 'validating'
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === `/batches/batch_${profileId}`) {
+      return createResponse(res, 200, {
+        id: `batch_${profileId}`,
+        object: 'batch',
+        status: 'validating'
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === `/batches/batch_${profileId}/cancel`) {
+      return createResponse(res, 200, {
+        id: `batch_${profileId}`,
+        object: 'batch',
+        status: 'cancelling'
+      });
+    }
+
     return createResponse(res, 404, { error: { message: 'unhandled route', path: url.pathname } });
   });
 

@@ -214,6 +214,7 @@ bun run integration:responses
 bun run integration:vector-stores
 bun run integration:uploads
 bun run integration:files
+bun run integration:batches
 ```
 
 环境变量：
@@ -247,6 +248,7 @@ bun run integration:files
 - `bun run integration:vector-stores` 会启动本地 mock upstream 与本地 worker，验证 `vector stores` 工具接口固定走默认 upstream profile，且请求带 `OpenAI-Beta: assistants=v2`
 - `bun run integration:uploads` 会启动本地 mock upstream 与本地 worker，验证 `uploads` 工具接口固定走默认 upstream profile，且 multipart 分片内容保持透传
 - `bun run integration:files` 会启动本地 mock upstream 与本地 worker，验证 `files` 工具接口固定走默认 upstream profile，且 multipart 文件体与原始内容下载保持透传
+- `bun run integration:batches` 会启动本地 mock upstream 与本地 worker，验证 `batches` 工具接口固定走默认 upstream profile
 - `AUTH_MODE=jwt` 下，管理接口通过 Bearer JWT 校验：
   - 当前要求 `HS256`
   - payload 至少满足 `role=admin` 或 `sub=admin`
@@ -337,7 +339,17 @@ files 工具链联调：
 - 自动验证以下行为：
   - `POST /v1/files`、`GET /v1/files`、`GET /v1/files/:fileId`、`GET /content`、`DELETE` 固定走默认 upstream profile
   - `POST /v1/files` 的 multipart 文件体不会被 worker 改写为空
-  - `GET /v1/files/:fileId/content` 会直接透传上游原始文本内容
+- `GET /v1/files/:fileId/content` 会直接透传上游原始文本内容
+- 脚本执行完成后会自动清理临时状态目录和本地进程
+
+batches 工具链联调：
+
+- 运行 `bun run integration:batches`
+- 脚本会自动启动两个本地 mock upstream 和一个本地 Worker
+- 自动验证以下行为：
+  - `GET /v1/batches`、`POST /v1/batches`、`GET /v1/batches/:batchId`、`POST /cancel` 固定走默认 upstream profile
+  - `POST /v1/batches` 的 JSON 请求体会原样送达上游
+  - `detail` 与 `cancel` 不会误打到非默认 upstream
 - 脚本执行完成后会自动清理临时状态目录和本地进程
 
 ## 目录结构
