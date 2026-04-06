@@ -4,8 +4,8 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import { runCommand, stopChild, waitForWorker } from './integration-helpers.mjs';
 
 const EDGE_PORT = 18894;
 const ADMIN_TOKEN = 'admin-dev-token';
@@ -17,61 +17,6 @@ function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
-}
-
-async function runCommand(command, args, options = {}) {
-  const child = spawn(command, args, {
-    cwd: options.cwd,
-    env: { ...process.env, ...options.env },
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-  let stdout = '';
-  let stderr = '';
-  child.stdout.on('data', (chunk) => {
-    stdout += String(chunk);
-  });
-  child.stderr.on('data', (chunk) => {
-    stderr += String(chunk);
-  });
-  const exitCode = await new Promise((resolve, reject) => {
-    child.once('error', reject);
-    child.once('close', resolve);
-  });
-  if (exitCode !== 0) {
-    throw new Error(`${command} ${args.join(' ')} failed\n${stdout}\n${stderr}`.trim());
-  }
-}
-
-async function waitForWorker(url) {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) {
-        return;
-      }
-    } catch {}
-    await delay(500);
-  }
-  throw new Error(`worker did not become ready: ${url}`);
-}
-
-async function stopChild(child) {
-  if (!child || child.exitCode !== null) {
-    return;
-  }
-  if (process.platform !== 'win32' && typeof child.pid === 'number') {
-    try {
-      process.kill(-child.pid, 'SIGKILL');
-    } catch {
-      child.kill('SIGKILL');
-    }
-  } else {
-    child.kill('SIGKILL');
-  }
-  await Promise.race([
-    new Promise((resolve) => child.once('close', resolve)),
-    delay(3000)
-  ]);
 }
 
 async function request(pathname, init = {}) {
