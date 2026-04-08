@@ -2,6 +2,8 @@ import type { Context, Next } from 'hono';
 import { getRuntimeConfig } from './config';
 import type { AppEnv } from './types';
 
+const ALLOWED_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
+
 function isAllowedOrigin(requestOrigin: string, allowedOrigins: string[]) {
   return allowedOrigins.includes('*') || allowedOrigins.includes(requestOrigin);
 }
@@ -10,7 +12,7 @@ function applyCorsHeaders(c: Context, requestOrigin: string) {
   c.header('Access-Control-Allow-Origin', requestOrigin);
   c.header('Access-Control-Allow-Credentials', 'true');
   c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  c.header('Access-Control-Allow-Methods', ALLOWED_METHODS);
   c.header('Vary', 'Origin');
 }
 
