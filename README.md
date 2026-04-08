@@ -250,7 +250,7 @@ bun run integration:all
 - `relay_models.upstream_profile_id` 负责把模型绑定到某个 profile
 - 旧的 `OPENAI_*` 单 profile 环境变量仍可继续作为兼容入口
 - `bun run integration:fine-tuning` 会启动本地 mock upstream 与本地 worker，验证 `jobs/create/detail/cancel/pause/resume/events/checkpoints/permissions` 这组 fine-tuning utility 端点固定转发到默认 upstream profile，且 query string 与 JSON 请求体保持透传
-- `bun run integration:control-plane` 会启动本地 worker，验证 `status/auth/admin/models/token` 这组控制面接口在 session 模式下的登录、bootstrap、模型启停、usage 参数校验和 token 生命周期
+- `bun run integration:control-plane` 会启动本地 worker，验证 `status/auth/admin/settings/models/token` 这组控制面接口在 session 模式下的登录、设置持久化、bootstrap、模型启停、usage 参数校验和 token 生命周期
 - `bun run integration:cors` 会启动一个带 `CORS_ORIGIN` 的本地 worker，验证预检和实际请求在允许/拒绝来源下的跨域行为，并覆盖 `PUT/PATCH/DELETE` 管理接口方法
 - `bun run integration:jwt-auth` 会启动一个 `AUTH_MODE=jwt` 的本地 worker，验证 `HS256 + exp + issuer/audience + admin identity` 这些约束都真实生效，且有效 JWT 可以访问管理面和 relay 模型目录
 - `bun run integration:legacy-config` 会启动一个只配置 `OPENAI_*` 环境变量的本地 worker，验证旧的单 profile 兼容入口仍可 bootstrap 模型目录并驱动 relay

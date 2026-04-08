@@ -218,6 +218,20 @@ export async function saveControlSettings(env: Env, settings: ControlSettingValu
   );
 }
 
+async function ensureDefaultControlSettings(env: Env) {
+  const row = await queryFirst<SettingRow>(
+    env,
+    'SELECT value_json FROM control_settings WHERE key = ?',
+    'app'
+  );
+
+  if (row) {
+    return;
+  }
+
+  await saveControlSettings(env, DEFAULT_SETTINGS);
+}
+
 export async function getAdminState(env: Env, config: RuntimeConfig): Promise<AdminStateShape> {
   if (!env.DB) {
     const envModels = fromEnvModels(config);
@@ -274,7 +288,7 @@ export async function bootstrapControlPlane(env: Env, config: RuntimeConfig) {
     );
   }
 
-  await saveControlSettings(env, DEFAULT_SETTINGS);
+  await ensureDefaultControlSettings(env);
   await writeModelCatalogCache(env, bootstrapModels);
 
   return getAdminState(env, config);

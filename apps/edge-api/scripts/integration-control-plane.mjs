@@ -141,6 +141,29 @@ try {
   assert(stateBeforeBootstrap.response.ok, 'admin state before bootstrap should succeed');
   assert(stateBeforeBootstrap.json.data.stateStore === 'd1', 'admin state should use D1 when configured');
   assert(Array.isArray(stateBeforeBootstrap.json.data.models) && stateBeforeBootstrap.json.data.models.length === 0, 'admin state before bootstrap should have no models');
+  assert(stateBeforeBootstrap.json.data.settings.publicAppName === 'new-api-cf', 'admin state before bootstrap should expose default app name');
+  assert(stateBeforeBootstrap.json.data.settings.welcomeMessage === 'Cloudflare Worker-first control plane', 'admin state before bootstrap should expose default welcome message');
+  assert(stateBeforeBootstrap.json.data.settings.playgroundEnabled === true, 'admin state before bootstrap should enable playground by default');
+
+  const saveSettings = await request('/api/admin/settings', {
+    method: 'PUT',
+    cookie: sessionCookie,
+    json: {
+      publicAppName: 'new-api-cf staging',
+      welcomeMessage: 'control plane smoke updated',
+      playgroundEnabled: false
+    }
+  });
+  assert(saveSettings.response.ok, 'settings save should succeed');
+  assert(saveSettings.json.data.saved === true, 'settings save should confirm persistence');
+
+  const stateAfterSettingsSave = await request('/api/admin/state', {
+    cookie: sessionCookie
+  });
+  assert(stateAfterSettingsSave.response.ok, 'admin state after settings save should succeed');
+  assert(stateAfterSettingsSave.json.data.settings.publicAppName === 'new-api-cf staging', 'saved app name should persist in admin state');
+  assert(stateAfterSettingsSave.json.data.settings.welcomeMessage === 'control plane smoke updated', 'saved welcome message should persist in admin state');
+  assert(stateAfterSettingsSave.json.data.settings.playgroundEnabled === false, 'saved playground toggle should persist in admin state');
 
   const bootstrap = await request('/api/admin/bootstrap', {
     method: 'POST',
@@ -148,6 +171,8 @@ try {
   });
   assert(bootstrap.response.ok, 'control plane bootstrap should succeed');
   assert(Array.isArray(bootstrap.json.data.models) && bootstrap.json.data.models.length === 2, 'bootstrap should seed both models from upstream profiles');
+  assert(bootstrap.json.data.settings.publicAppName === 'new-api-cf staging', 'bootstrap response should preserve saved app name');
+  assert(bootstrap.json.data.settings.playgroundEnabled === false, 'bootstrap response should preserve saved playground toggle');
 
   const publicModels = await request('/api/models');
   assert(publicModels.response.ok, 'public model catalog should succeed');
@@ -270,7 +295,7 @@ try {
     verified: [
       'status and session endpoints reflect session-mode control plane state',
       'login and logout manage admin session cookies explicitly',
-      'bootstrap, model updates, and usage validation behave correctly through admin routes',
+      'settings persistence, bootstrap, model updates, and usage validation behave correctly through admin routes',
       'api token lifecycle gates relay model access after model and token changes'
     ]
   }, null, 2));
